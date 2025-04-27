@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.db
+candidate_submissions/
+evaluation_results/
+exam_questions.db
+promptcraft_questions.db
+Dockerfile*
+docker-compose.yml
+*.log

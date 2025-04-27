@@ -36,6 +36,88 @@ PromptCraft is implemented as a Python framework with the following key features
 - Structured output and reporting for easy assessment
 - Support for various programming languages and difficulty levels
 
+## User Stories
+
+The following personas and goals guide PromptCraft's design:
+- **New Developer / Learner**: Build foundational understanding via AI-driven explanations.
+- **Feature Developer**: Quickly scaffold and enhance new features with robust prompt templates.
+- **Code Maintainer / Refactorer**: Refactor and modularize code using targeted AI prompts.
+- **Troubleshooter**: Systematically debug and resolve issues with AI-assisted logs.
+- **Continuous Learner**: Deep-dive into technologies and best practices.
+- **Contributor / Collaborator**: Use clear templates to propose and review changes.
+- **Project Owner / Maintainer**: Provide structured prompt guides and metrics.
+
+## General Architecture
+
+PromptCraft is composed of:
+- **SQLite Databases**:
+  - `promptcraft_questions.db` for interactive CLI tasks.
+  - `exam_questions.db` for exam questions extracted from Markdown prompts.
+- **CLI Interface** (`promptcraft.cli`):
+  - Presents tasks, captures prompts, simulates LLM responses, records evaluations.
+- **TaskHandler**:
+  - Manages task presentation and submission recording.
+- **Evaluator**:
+  - Records structured evaluation results.
+- **Initialization Scripts**:
+  - `initialize_database.py`: Seeds initial coding tasks.
+  - `exam_init.py`: Extracts exam questions from `./prompts/`.
+- **Dockerfile**:
+  - Containerized deployment for consistent environments.
+
+## Workflow
+
+1. Initialize the task database:
+   ```bash
+   python initialize_database.py
+   ```
+2. (Optional) Generate exam questions:
+   ```bash
+   python exam_init.py
+   ```
+3. Run an assessment:
+   ```bash
+   python -m promptcraft.cli --candidate <ID>
+   ```
+4. Review candidate prompts in `candidate_submissions/` and evaluation results in `evaluation_results/`.
+
+## Deployment
+
+Deploy locally or via Docker:
+- **Local Python**:
+  ```bash
+  pip install -r requirements.txt
+  python initialize_database.py
+  python -m promptcraft.cli --candidate alice
+  ```
+- **Docker**:
+  ```bash
+  docker build -t promptcraft .
+  docker run -it --rm -e CANDIDATE_ID=alice promptcraft -- --candidate alice
+  ```
+
+## Example
+
+Example session (interactive):
+```text
+--- Task 1 ---
+Write a Python function that calculates the factorial of a number.
+
+Please provide the prompt you would use to instruct an LLM to generate the code:
+> I want a Python function factorial(n) that handles negative input with ValueError.
+
+Submission recorded in 'candidate_submissions/alice_task1_20250427_044145.txt'
+...
+```
+
+## Unit Test Report
+
+The latest unit test report summary (see `unit_test_report.md`):
+```text
+.......                                                                  [100%]
+7 passed in 0.15s
+```
+
 ## Getting Started
 
 1. Clone this repository
@@ -43,13 +125,18 @@ PromptCraft is implemented as a Python framework with the following key features
    ```
    pip install -r requirements.txt
    ```
-3. Run the initialization script to set up the SQLite database:
+3. Run the initialization script to set up the PromptCraft tasks database (for assessments):
    ```
    python initialize_database.py
    ```
-4. Start using PromptCraft to create and administer assessments:
+4. (Optional) Generate and initialize the exam question database from the AI prompt guides:
    ```
-   python promptcraft.py --candidate candidate_id
+   python exam_init.py
+   ```
+   This will create `exam_questions.db` in the project root and populate it with exam questions extracted from the Markdown files under `./prompts/`.
+5. Start using PromptCraft to create and administer assessments:
+   ```bash
+   python -m promptcraft.cli --candidate candidate_id
    ```
 
 ## Use Cases
@@ -59,22 +146,52 @@ PromptCraft is implemented as a Python framework with the following key features
 - Training and skill development for prompt engineering
 - Evaluating team members' ability to work effectively with AI tools
 
+## Running with Docker
+
+You can containerize PromptCraft using the provided Dockerfile.
+
+1. Build the image:
+   ```bash
+   docker build -t promptcraft .
+   ```
+2. Run the CLI interactively (set candidate via flag or env var):
+   ```bash
+   docker run -it --rm \
+     -e CANDIDATE_ID=alice \
+     promptcraft -- --candidate alice
+   ```
+   Or rely on the environment variable alone:
+   ```bash
+   docker run -it --rm \
+     -e CANDIDATE_ID=alice \
+     promptcraft
+   ```
+
+By default, the databases are initialized at build time. To persist submissions or evaluation results, mount volumes:
+```bash
+docker run -it --rm \
+  -e CANDIDATE_ID=alice \
+  -v "$(pwd)/candidate_submissions:/app/candidate_submissions" \
+  -v "$(pwd)/evaluation_results:/app/evaluation_results" \
+  promptcraft
+```
+
 ## Software Licensing and Commercialization Plan
 
-1.  **Software Licensing:**
-    The software will be released under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0). This permissive open-source license allows for broad adoption, modification, and distribution, including commercial use, while requiring the preservation of copyright notices and disclaimers.
+1. **Software Licensing:** Released under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0), allowing free use, modification, and distribution with preservation of notices.
+2. **Revenue Generation:** A one-time **USD 9.90** technical service fee applies to access the pre-packaged distribution, supporting ongoing development and maintenance.
+3. **Payment Method:** We accept payments in **USD Coin (USDC)** and also welcome **Solana (SOL)** donations at our Phantom Wallet address:
+   `ESUpLq9tCo1bmauWoN1rgNiYwwr5K587h15SrJz9L7ct`
+4. **Custom Solutions:** Bespoke software development services are available. Contact us via Telegram at **@tonyironreal** to discuss your project needs.
 
-2.  **Revenue Generation - Software Access Fee:**
-    A one-time **USD 9.90** technical service fee will be applied for accessing and utilizing the pre-packaged software distribution. This fee is intended to support ongoing development, maintenance, and the provision of convenient access to the software. It is important to note that the underlying software remains open-source under the terms of the Apache License 2.0, allowing technically proficient users the option to build and utilize the software independently without incurring this fee.
 
-3.  **Payment Method:**
-    We will primarily accept payments in **USD Coin (USDC)** for the aforementioned software access fee. Details regarding the payment process will be clearly outlined on our designated platform.
+## Running Unit Tests
 
-    **We also accept Solana (SOL) donations at the following Phantom Wallet address:**
-    `ESUpLq9tCo1bmauWoN1rgNiYwwr5K587h15SrJz9L7ct`
-
-4.  **Custom Project Solutions:**
-    In addition to the standard software offering, we provide bespoke software definition and development services tailored to specific client requirements. Interested parties are invited to discuss their unique project needs and explore potential collaborations by contacting us via Telegram at **@tonyironreal**.
+After installing dependencies, you can run the full test suite and generate a Markdown report:
+```bash
+python run_unit_tests.py
+```  
+This will create `unit_test_report.md` in the project root, summarizing pytest output and exit code.
 
 ## Contributing
 
