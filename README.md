@@ -49,7 +49,7 @@ PromptCraft is implemented as a Python framework with the following key features
    ```
 4. Start using PromptCraft to create and administer assessments:
    ```
-   python promptcraft.py
+   python promptcraft.py --candidate candidate_id
    ```
 
 ## Use Cases
@@ -59,10 +59,27 @@ PromptCraft is implemented as a Python framework with the following key features
 - Training and skill development for prompt engineering
 - Evaluating team members' ability to work effectively with AI tools
 
+## Software Licensing and Commercialization Plan
+
+1.  **Software Licensing:**
+    The software will be released under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0). This permissive open-source license allows for broad adoption, modification, and distribution, including commercial use, while requiring the preservation of copyright notices and disclaimers.
+
+2.  **Revenue Generation - Software Access Fee:**
+    A one-time **USD 9.90** technical service fee will be applied for accessing and utilizing the pre-packaged software distribution. This fee is intended to support ongoing development, maintenance, and the provision of convenient access to the software. It is important to note that the underlying software remains open-source under the terms of the Apache License 2.0, allowing technically proficient users the option to build and utilize the software independently without incurring this fee.
+
+3.  **Payment Method:**
+    We will primarily accept payments in **USD Coin (USDC)** for the aforementioned software access fee. Details regarding the payment process will be clearly outlined on our designated platform.
+
+    **We also accept Solana (SOL) donations at the following Phantom Wallet address:**
+    `ESUpLq9tCo1bmauWoN1rgNiYwwr5K587h15SrJz9L7ct`
+
+4.  **Custom Project Solutions:**
+    In addition to the standard software offering, we provide bespoke software definition and development services tailored to specific client requirements. Interested parties are invited to discuss their unique project needs and explore potential collaborations by contacting us via Telegram at **@tonyironreal**.
+
 ## Contributing
 
 We welcome contributions to enhance PromptCraft's capabilities. Please see our contribution guidelines for more information.
 
 ## License
 
-[Specify your license here] 
+[Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0) 
