@@ -1,0 +1,6 @@
+# Change Log
+#
+# All notable changes to this project. Each entry: YYYY-MM-DD HH:MM:SS - description
+
+2025-04-27 12:20:18 - Added .gitignore to exclude Python cache/compiled files, virtual environment directories, SQLite database files, candidate submissions and evaluation results directories, environment variable files, log files, coverage and pytest artifacts, and editor/OS metadata files.
+2025-04-27 12:22:50 - Created changes.log to record all notable project modifications with timestamps.
