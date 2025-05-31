@@ -11,7 +11,7 @@ LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(module)s:%(lineno)d - %
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 def setup_logger(name="promptcraft"):
-    \"\"\"Configures and returns a logger instance.\"\"\"
+    """Configures and returns a logger instance."""
     logger = logging.getLogger(name)
     
     # Prevent adding multiple handlers if logger is already configured (e.g., in tests or reloads)

@@ -43,12 +43,12 @@ async def shutdown_event():
 
 @app.get("/", tags=["Root"])
 async def read_root():
-    \"\"\"Root endpoint providing a welcome message.\"\"\"
+    """Root endpoint providing a welcome message."""
     return {"message": "Welcome to the PromptCraft API"}
 
 @app.get("/health", tags=["Health"])
 async def health_check():
-    \"\"\"Health check endpoint.\"\"\"
+    """Health check endpoint."""
     # Basic health check. Can be expanded to check DB, Redis connectivity.
     # For example, check redis_cache.is_connected() and db_handler.connect() (without making a full query)
     return {"status": "healthy"}

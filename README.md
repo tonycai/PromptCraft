@@ -46,10 +46,10 @@ PromptCraft is implemented as a modern full-stack web application with comprehen
 - **Structured Evaluation**: Comprehensive evaluation recording and retrieval
 
 ### 🗄️ **Database & Storage**
-- **MySQL Database**: Scalable relational database for production use
-- **Redis Cache**: High-performance caching for API responses
+- **MySQL Database**: Scalable relational database on port 3306 for production use
+- **Redis Cache**: High-performance caching for API responses on port 6379
 - **File Storage**: Organized submission and evaluation result storage
-- **Docker Support**: Full containerization for easy deployment
+- **Docker Support**: Full containerization with Docker Compose orchestration
 
 ### 🔧 **Development Features**
 - **Docker Compose**: Complete development environment setup
@@ -98,10 +98,10 @@ PromptCraft's modern full-stack architecture includes:
 - **Redis Cache**: Caching layer for improved performance
 
 ### 🗄️ **Database & Storage**
-- **MySQL Database**: Production-ready relational database
-- **Redis Cache**: In-memory caching for API responses
+- **MySQL Database**: Production-ready relational database on standard port 3306
+- **Redis Cache**: In-memory caching for API responses on port 6379
 - **File Storage**: Organized directory structure for submissions and evaluations
-- **Volume Persistence**: Docker volumes for data persistence
+- **Volume Persistence**: Docker volumes for data persistence across restarts
 
 ### 🐳 **Docker Infrastructure**
 - **Multi-stage Dockerfiles**: Optimized for development and production
@@ -110,13 +110,24 @@ PromptCraft's modern full-stack architecture includes:
 - **Environment Configuration**: Flexible environment variable management
 - **Volume Management**: Persistent data storage
 
+## ✨ Recent Updates
+
+### Version 2.0 - Full Stack Implementation
+- **Complete Next.js Frontend**: Modern React-based UI with TypeScript and Tailwind CSS
+- **Enhanced Docker Support**: Full containerization with production-ready configuration
+- **Improved Database Configuration**: MySQL on standard port 3306 with optimized health checks
+- **Redis Integration**: High-performance caching layer for improved API response times
+- **Comprehensive Authentication**: JWT-based auth system with secure password hashing
+- **Interactive Submission Interface**: Real-time prompt submission with AI response display
+- **Evaluation Dashboard**: Complete evaluation interface with structured feedback system
+
 ## 🚀 Quick Start
 
 ### Prerequisites
 - Docker and Docker Compose
 - Git
 - At least 4GB RAM
-- Ports 3000, 8000, 3307, 6379 available
+- Ports 3000, 8000, 3306, 6379 available
 
 ### 1. Clone and Setup
 ```bash

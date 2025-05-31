@@ -43,20 +43,19 @@ services:
       dockerfile: api/Dockerfile 
     container_name: promptcraft_db_init_mysql
     command: >
-      sh -c "echo 'Waiting for MySQL to be healthy...' && \
-             # Simple wait loop, or use docker-compose-wait for more robustness
-             while ! mysqladmin ping -h mysql_db --silent; do sleep 1; done && \
-             echo 'MySQL is up, running init scripts...' && \
+      sh -c "echo 'Waiting for MySQL to be ready...' && \
+             python wait_for_mysql.py && \
+             echo 'MySQL is ready! Running initialization scripts...' && \
              python initialize_database.py && \
              python exam_init.py && \
-             echo 'Databases initialized successfully in MySQL. This container will now exit.'"
+             echo 'Databases initialized successfully in MySQL. Container will now exit.'"
     environment:
       - PYTHONPATH=/app
       - MYSQL_HOST=mysql_db # Service name in Docker network
       - MYSQL_USER=${MYSQL_USER:-promptcraft_user}
       - MYSQL_PASSWORD=${MYSQL_PASSWORD:-promptcraft_password}
       - MYSQL_DATABASE=${MYSQL_DATABASE:-promptcraft_db}
-      - MYSQL_PORT=${MYSQL_PORT:-3306}
+      - MYSQL_PORT=3306 # Use internal MySQL port for Docker network communication
       - LOG_LEVEL=${LOG_LEVEL:-INFO} # Also for init scripts if they use the logger
       # OPENAI_API_KEY: not needed for db_init
     depends_on:
@@ -88,7 +87,7 @@ services:
       - MYSQL_USER=${MYSQL_USER:-promptcraft_user} # Get from .env or use default
       - MYSQL_PASSWORD=${MYSQL_PASSWORD:-promptcraft_password} # Get from .env or use default
       - MYSQL_DATABASE=${MYSQL_DATABASE:-promptcraft_db} # Get from .env or use default
-      - MYSQL_PORT=${MYSQL_PORT:-3306}
+      - MYSQL_PORT=3306 # Use internal MySQL port for Docker network communication
       - REDIS_HOST=redis_cache # Service name of Redis
       - REDIS_PORT=${REDIS_PORT:-6379}
       - LOG_LEVEL=${LOG_LEVEL:-INFO} # Added LOG_LEVEL for backend

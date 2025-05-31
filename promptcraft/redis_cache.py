@@ -32,7 +32,6 @@ class RedisCache:
                 host=self.redis_host,
                 port=self.redis_port,
                 db=self.redis_db,
-                charset="utf-8",
                 decode_responses=True # Decode responses from bytes to string
             )
             self.r.ping() # Verify connection

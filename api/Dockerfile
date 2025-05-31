@@ -38,6 +38,7 @@ COPY ./api /app/api
 COPY ./promptcraft /app/promptcraft
 COPY ./initialize_database.py /app/
 COPY ./exam_init.py /app/
+COPY ./wait_for_mysql.py /app/
 COPY ./prompts /app/prompts
 
 # Create directories for persistent data if they are not created by the app itself
