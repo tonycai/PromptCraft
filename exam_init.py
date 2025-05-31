@@ -1,32 +1,30 @@
 #!/usr/bin/env python3
 """
-Initialize an exam SQLite database with questions extracted from the prompts directory.
+Initialize exam questions in the MySQL database (promptcraft_db.exam_questions table)
+with questions extracted from the prompts directory.
 This script parses each Markdown file in ./prompts/, extracts prompt sections,
-and inserts them as exam questions into exam_questions.db.
+and inserts them as exam questions.
 """
 import os
-import sqlite3
+from promptcraft.database.db_handler import DatabaseHandler # Use the MySQL capable handler
 
-DB_FILE = "exam_questions.db"
 PROMPTS_DIR = "prompts"
 
-def initialize_exam_db(db_path):
-    """Create the exam_questions table in the database."""
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS exam_questions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            guide_section TEXT,
-            question_text TEXT NOT NULL,
-            answer_text TEXT,
-            question_type TEXT DEFAULT 'short-answer'
-        )
-        """
-    )
-    conn.commit()
-    conn.close()
+# Helper to load environment variables (same as in initialize_database.py)
+def load_dotenv_if_present():
+    try:
+        from dotenv import load_dotenv
+        dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
+        if os.path.exists(dotenv_path):
+            load_dotenv(dotenv_path)
+            print(".env file loaded for local execution of exam_init.")
+        elif os.path.exists('.env'):
+            load_dotenv()
+            print(".env file loaded from current directory for local execution of exam_init.")
+    except ImportError:
+        print("python-dotenv not installed, .env file will not be loaded by this script for exam_init.")
+    except Exception as e:
+        print(f"Error loading .env file for exam_init: {e}")
 
 def extract_sections_from_file(file_path):
     """Extract headings and content sections from a Markdown file."""
@@ -51,40 +49,56 @@ def extract_sections_from_file(file_path):
             i += 1
     return sections
 
-def populate_exam_db(db_path, prompts_dir):
-    """Read all Markdown files in prompts_dir and insert sections into the exam DB."""
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    total = 0
-    for fname in os.listdir(prompts_dir):
+def populate_exam_db_mysql(db_handler: DatabaseHandler, prompts_dir_path: str):
+    """Read all Markdown files in prompts_dir_path and insert sections into the exam_questions table via db_handler."""
+    total_inserted = 0
+    if not os.path.isdir(prompts_dir_path):
+        print(f"Error: Prompts directory '{prompts_dir_path}\' not found at {os.path.abspath(prompts_dir_path)}.")
+        return
+
+    for fname in os.listdir(prompts_dir_path):
         if not fname.lower().endswith('.md'):
             continue
-        path = os.path.join(prompts_dir, fname)
+        path = os.path.join(prompts_dir_path, fname)
         sections = extract_sections_from_file(path)
         for heading, content in sections:
             question_text = (
-                f"From the guide '{fname}', section '{heading}', describe the purpose and usage of the following AI prompt template:\n\n{content}"
+                f"From the guide '{fname}', section '{heading}', describe the purpose and usage of the following AI prompt template:\\n\\n{content}"
             )
-            cursor.execute(
-                "INSERT INTO exam_questions (guide_section, question_text) VALUES (?, ?)",
-                (f"{fname} - {heading}", question_text)
+            # Use the db_handler to add the exam question
+            question_id = db_handler.add_exam_question(
+                guide_section=f"{fname} - {heading}",
+                question_text=question_text
             )
-            total += 1
-    conn.commit()
-    conn.close()
-    print(f"Inserted {total} exam questions into '{db_path}'.")
+            if question_id:
+                total_inserted += 1
+            else:
+                print(f"Failed to insert exam question from {fname} - {heading}")
+    print(f"Inserted {total_inserted} exam questions into the database.")
 
 def main():
+    load_dotenv_if_present() # Load .env for local runs
+
+    db_handler = DatabaseHandler() # Uses env vars for connection
+
     # Ensure prompts directory exists
     if not os.path.isdir(PROMPTS_DIR):
-        print(f"Error: prompts directory '{PROMPTS_DIR}' not found.")
+        print(f"Error: prompts directory '{PROMPTS_DIR}\' not found at {os.path.abspath(PROMPTS_DIR)}.")
         return
-    # Remove existing DB file to reinitialize
-    if os.path.exists(DB_FILE):
-        os.remove(DB_FILE)
-    initialize_exam_db(DB_FILE)
-    populate_exam_db(DB_FILE, PROMPTS_DIR)
-    print("Exam database initialization complete.")
+
+    # 1. Ensure database and tables exist (includes exam_questions table)
+    print("Initializing tables (including exam_questions)...")
+    db_handler.initialize_tables()
+
+    # 2. Clear existing exam questions from the table for a fresh start
+    print("Clearing existing exam questions...")
+    db_handler.clear_exam_questions()
+
+    # 3. Populate the exam_questions table
+    print(f"Populating exam questions from '{PROMPTS_DIR}\' directory...")
+    populate_exam_db_mysql(db_handler, PROMPTS_DIR)
+    
+    print("Exam questions processing complete.")
 
 if __name__ == '__main__':
     main()

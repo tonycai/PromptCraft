@@ -1,15 +1,40 @@
 #!/usr/bin/env python3
 """
-Initialize the PromptCraft database and seed it with sample questions.
+Initialize the PromptCraft database (MySQL) and seed it with sample questions.
 """
-
+import os
 from promptcraft.database.db_handler import DatabaseHandler
 
+# Helper to load environment variables if .env file exists, for local script execution
+# In Docker, these would be set in the Docker environment.
+def load_dotenv_if_present():
+    try:
+        from dotenv import load_dotenv
+        # Assuming .env is in the project root, and this script is in the project root.
+        # Adjust path if script is moved or .env is elsewhere.
+        dotenv_path = os.path.join(os.path.dirname(__file__), '.env') # More robust path finding
+        if os.path.exists(dotenv_path):
+            load_dotenv(dotenv_path)
+            print(".env file loaded for local execution.")
+        elif os.path.exists('.env'): # Fallback for current dir if script is at root
+            load_dotenv()
+            print(".env file loaded from current directory for local execution.")
+    except ImportError:
+        print("python-dotenv not installed, .env file will not be loaded by this script.")
+    except Exception as e:
+        print(f"Error loading .env file: {e}")
 
 def main():
-    """Initialize the database and add sample questions."""
-    db_handler = DatabaseHandler()
-    db_handler.initialize_database()
+    """Initialize the database tables and add sample questions."""
+    load_dotenv_if_present() # Load .env for local runs
+    
+    db_handler = DatabaseHandler() # Now connects using env vars
+    
+    # Ensure database exists and initialize tables
+    # ensure_database_exists is called in db_handler.__init__ if uncommented, 
+    # or called explicitly by initialize_tables method now.
+    print("Initializing tables...")
+    db_handler.initialize_tables() 
     
     # Sample questions to add
     sample_questions = [
@@ -52,17 +77,17 @@ def main():
     ]
     
     # Add each sample question to the database
-    for question in sample_questions:
+    print("Adding sample questions to 'questions' table...")
+    for question_data in sample_questions: # Renamed to avoid conflict with 'questions' table name
         db_handler.add_question(
-            description=question["description"],
-            expected_outcome=question["expected_outcome"],
-            evaluation_criteria=question["evaluation_criteria"],
-            programming_language=question["programming_language"],
-            difficulty_level=question["difficulty_level"]
+            description=question_data["description"],
+            expected_outcome=question_data["expected_outcome"],
+            evaluation_criteria=question_data["evaluation_criteria"],
+            programming_language=question_data["programming_language"],
+            difficulty_level=question_data["difficulty_level"]
         )
     
     print("Database initialization complete. Sample questions have been added.")
-
 
 if __name__ == "__main__":
     main() 

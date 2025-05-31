@@ -1,0 +1,23 @@
+node_modules
+.next
+out
+
+# Local environment variables
+.env*.local
+.env
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Test files and coverage
+coverage
+src/**/*.test.*
+src/**/*.spec.*
+
+# Editor and OS files
+.vscode
+.idea
+*.iml
+.DS_Store 

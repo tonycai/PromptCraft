@@ -4,10 +4,37 @@ PromptCraft CLI - A framework for assessing prompting proficiency.
 """
 import os
 import argparse
+from openai import OpenAI
 from promptcraft.database.db_handler import DatabaseHandler
 from promptcraft.tasks.task_handler import TaskHandler
 from promptcraft.evaluation.evaluator import Evaluator
 
+# Load API key from environment variable
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+client = None
+if OPENAI_API_KEY:
+    client = OpenAI(api_key=OPENAI_API_KEY)
+else:
+    print("Warning: OPENAI_API_KEY environment variable not set. LLM calls will be simulated.")
+
+
+def get_llm_response(prompt):
+    """Gets a response from the OpenAI API or simulates if key is missing."""
+    if not client:
+        print("(Simulating LLM response as API key is missing...)")
+        return simulate_llm_response(prompt) # Fallback to simulation
+    try:
+        completion = client.chat.completions.create(
+            model="gpt-3.5-turbo",  # Or another suitable model
+            messages=[
+                {"role": "user", "content": prompt}
+            ]
+        )
+        return completion.choices[0].message.content
+    except Exception as e:
+        print(f"Error during LLM API call: {e}")
+        print("Falling back to simulated response.")
+        return simulate_llm_response(prompt) # Fallback to simulation on error
 
 def simulate_llm_response(prompt):
     """
@@ -57,7 +84,7 @@ def run_assessment(candidate_id):
         task_id, desc = q['id'], q['description']
         print(f"\n--- Task {task_id} ---\n{desc}")
         prompt = task_handler.present_task(task_id, desc)
-        code = simulate_llm_response(prompt)
+        code = get_llm_response(prompt)
         task_handler.record_submission(candidate_id, task_id, prompt, code)
         details = db_handler.get_question_details(task_id)
         criteria = details.get('evaluation_criteria') if details else None
@@ -74,6 +101,13 @@ def main():
     cid = args.candidate or os.getenv('CANDIDATE_ID')
     if not cid:
         parser.error("Provide --candidate or set CANDIDATE_ID.")
+    
+    # Check for API key before running assessment if we intend to use real LLM
+    if not OPENAI_API_KEY:
+        print("Consider setting the OPENAI_API_KEY environment variable for real LLM interaction.")
+        # Depending on policy, you might choose to exit here or always allow simulation
+        # For now, it proceeds with simulation as per get_llm_response logic
+
     run_assessment(cid)
 
 

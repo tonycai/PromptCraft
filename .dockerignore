@@ -1,12 +1,63 @@
+# General ignores
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
-*.db
-candidate_submissions/
-evaluation_results/
-exam_questions.db
-promptcraft_questions.db
-Dockerfile*
-docker-compose.yml
+*.py[cod]
+*$py.class
+
+# Virtual environment directories
+env/
+venv/
+.venv/
+
+# SQLite database files (if not intended to be copied into image initially)
+# *.db
+
+# dotenv environment variables file
+.env
+*.env.*
+
+# Python log files (except changes.log if it's versioned)
 *.log
+
+# Editor directories and files
+.vscode/
+.idea/
+*.swp
+*~
+
+# macOS files
+.DS_Store
+
+# Windows files
+Thumbs.db
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Coverage reports
+.coverage
+htmlcov/
+
+# Pytest cache
+.pytest_cache/
+
+# Git directory
+.git/
+
+# Frontend directory (if backend Docker build is from root)
+frontend/
+
+# Docker specific files (if backend build is from root)
+# Dockerfile # This depends on where you run docker build from
+# docker-compose.yml
+# docker-compose.prod.yml
+
+# Output directories that are volume mounted
+# candidate_submissions/
+# evaluation_results/
+# database_files/
+
+# Old Dockerfile if it's at root and not used for API
+# Dockerfile # If the root Dockerfile is the old one
+
+# If you have a global node_modules for any reason
+node_modules/

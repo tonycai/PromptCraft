@@ -1,0 +1,142 @@
+version: '3.8'
+
+services:
+  mysql_db:
+    image: mysql:8.0
+    container_name: promptcraft_mysql_dev
+    command: --default-authentication-plugin=mysql_native_password # For wider client compatibility
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-supersecretroot}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-promptcraft_db}
+      MYSQL_USER: ${MYSQL_USER:-promptcraft_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-promptcraft_password}
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql_data_dev:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost", "-u$${MYSQL_USER}", "-p$${MYSQL_PASSWORD}"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s # Give MySQL more time to initialize
+
+  redis_cache:
+    image: redis:7-alpine
+    container_name: promptcraft_redis_dev
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data_dev:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  db_init:
+    build:
+      context: .
+      dockerfile: api/Dockerfile 
+    container_name: promptcraft_db_init_mysql
+    command: >
+      sh -c "echo 'Waiting for MySQL to be healthy...' && \
+             # Simple wait loop, or use docker-compose-wait for more robustness
+             while ! mysqladmin ping -h mysql_db --silent; do sleep 1; done && \
+             echo 'MySQL is up, running init scripts...' && \
+             python initialize_database.py && \
+             python exam_init.py && \
+             echo 'Databases initialized successfully in MySQL. This container will now exit.'"
+    environment:
+      - PYTHONPATH=/app
+      - MYSQL_HOST=mysql_db # Service name in Docker network
+      - MYSQL_USER=${MYSQL_USER:-promptcraft_user}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-promptcraft_password}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-promptcraft_db}
+      - MYSQL_PORT=${MYSQL_PORT:-3306}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO} # Also for init scripts if they use the logger
+      # OPENAI_API_KEY: not needed for db_init
+    depends_on:
+      mysql_db: # db_init depends on mysql_db service, healthcheck ensures it is ready
+        condition: service_healthy
+    # No volumes needed for db_init to create .db files anymore
+
+  backend:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    container_name: promptcraft_backend_dev_mysql_redis
+    command: uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
+    volumes:
+      - ./api:/app/api
+      - ./promptcraft:/app/promptcraft
+      - ./prompts:/app/prompts # For completeness, though not directly used by backend
+      - ./candidate_submissions:/app/candidate_submissions 
+      - ./evaluation_results:/app/evaluation_results
+      # .db file mounts are removed as MySQL is used
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env 
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/app
+      - MYSQL_HOST=mysql_db # Connect to MySQL service
+      - MYSQL_USER=${MYSQL_USER:-promptcraft_user} # Get from .env or use default
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-promptcraft_password} # Get from .env or use default
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-promptcraft_db} # Get from .env or use default
+      - MYSQL_PORT=${MYSQL_PORT:-3306}
+      - REDIS_HOST=redis_cache # Service name of Redis
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO} # Added LOG_LEVEL for backend
+      # OPENAI_API_KEY is expected from .env
+    depends_on:
+      mysql_db: # Backend depends on mysql_db service
+        condition: service_healthy
+      redis_cache:
+        condition: service_healthy
+      db_init: # Ensure db_init has completed (or at least started and exited if one-off)
+        condition: service_completed_successfully # if db_init is a one-off task
+    healthcheck: # Healthcheck for the backend service itself
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"] # Changed to /health
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 15s # Allow time for backend to connect to DB and Redis
+
+  # Placeholder for frontend service - uncomment and configure when Next.js app is ready
+  # frontend:
+  #   build:
+  #     context: ./frontend # Assumes Next.js project is in 'frontend' directory
+  #     dockerfile: Dockerfile
+  #     target: deps # Use deps stage for dev to leverage npm ci and then mount code
+  #   container_name: promptcraft_frontend_dev
+  #   command: npm run dev
+  #   volumes:
+  #     - ./frontend:/app # Mount frontend code for hot-reloading
+  #     - /app/node_modules # Anonymous volume for node_modules, to avoid overwriting container's node_modules
+  #     - /app/.next # Anonymous volume for .next build artifacts
+  #   ports:
+  #     - "3000:3000"
+  #   env_file:
+  #     - ./frontend/.env.local # Or .env if you use that for Next.js local dev
+  #   environment:
+  #     - NEXT_PUBLIC_API_URL=http://backend:8000/api/v1 # Communication via Docker network
+  #     # CHOKIDAR_USEPOLLING=true # May be needed for hot-reloading in some Docker setups
+  #   depends_on:
+  #     - backend
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:3000/"] # Basic check for Next.js dev server
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 5
+  #     start_period: 10s
+
+volumes:
+  mysql_data_dev: # Named volume for MySQL data persistence
+  redis_data_dev:
+  node_modules_frontend: # Example if you want to name the anonymous volume
+  next_build_frontend: # Example if you want to name the anonymous volume 
