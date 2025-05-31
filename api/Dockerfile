@@ -38,8 +38,7 @@ COPY ./api /app/api
 COPY ./promptcraft /app/promptcraft
 COPY ./initialize_database.py /app/
 COPY ./exam_init.py /app/
-RUN mkdir -p /app/prompts # Explicitly create destination directory
-COPY prompts/sample_guide.md /app/prompts/sample_guide.md # Copy the specific file
+COPY ./prompts /app/prompts
 
 # Create directories for persistent data if they are not created by the app itself
 # These should ideally be mounted as volumes

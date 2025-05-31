@@ -107,33 +107,30 @@ services:
       retries: 5
       start_period: 15s # Allow time for backend to connect to DB and Redis
 
-  # Placeholder for frontend service - uncomment and configure when Next.js app is ready
-  # frontend:
-  #   build:
-  #     context: ./frontend # Assumes Next.js project is in 'frontend' directory
-  #     dockerfile: Dockerfile
-  #     target: deps # Use deps stage for dev to leverage npm ci and then mount code
-  #   container_name: promptcraft_frontend_dev
-  #   command: npm run dev
-  #   volumes:
-  #     - ./frontend:/app # Mount frontend code for hot-reloading
-  #     - /app/node_modules # Anonymous volume for node_modules, to avoid overwriting container's node_modules
-  #     - /app/.next # Anonymous volume for .next build artifacts
-  #   ports:
-  #     - "3000:3000"
-  #   env_file:
-  #     - ./frontend/.env.local # Or .env if you use that for Next.js local dev
-  #   environment:
-  #     - NEXT_PUBLIC_API_URL=http://backend:8000/api/v1 # Communication via Docker network
-  #     # CHOKIDAR_USEPOLLING=true # May be needed for hot-reloading in some Docker setups
-  #   depends_on:
-  #     - backend
-  #   healthcheck:
-  #     test: ["CMD", "curl", "-f", "http://localhost:3000/"] # Basic check for Next.js dev server
-  #     interval: 30s
-  #     timeout: 10s
-  #     retries: 5
-  #     start_period: 10s
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: development
+    container_name: promptcraft_frontend_dev
+    volumes:
+      - ./frontend:/app # Mount frontend code for hot-reloading
+      - /app/node_modules # Anonymous volume for node_modules
+      - /app/.next # Anonymous volume for .next build artifacts
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
+      - CHOKIDAR_USEPOLLING=true # For hot-reloading in Docker
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 15s
 
 volumes:
   mysql_data_dev: # Named volume for MySQL data persistence

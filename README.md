@@ -1,6 +1,6 @@
 # PromptCraft
 
-A framework for assessing and evaluating "prompting proficiency" in technical interviews - the ability to effectively instruct AI language models for code generation.
+A comprehensive web-based framework for assessing and evaluating "prompting proficiency" in technical interviews - the ability to effectively instruct AI language models for code generation.
 
 ## Overview
 
@@ -28,15 +28,35 @@ The PromptCraft workflow consists of the following components:
 
 ## Implementation
 
-PromptCraft is implemented as a Python framework and is transitioning towards a web-based application. Key features include:
+PromptCraft is implemented as a modern full-stack web application with comprehensive features:
 
-- SQLite databases for storing code generation tasks, exam questions, and evaluation criteria.
-- **FastAPI Backend**: Provides a RESTful API for managing assessments, questions, submissions, and evaluations.
-- **Next.js Frontend (Planned)**: A modern web interface for candidates and interviewers.
-- Original CLI Interface (`promptcraft.cli`): For running assessments directly from the command line (still functional).
-- Integration options with real LLM APIs (e.g., OpenAI, Google Cloud), with current support for OpenAI via API key.
-- Structured output and reporting for easy assessment (candidate submissions in `candidate_submissions/`, evaluations in `evaluation_results/`).
-- Support for various programming languages and difficulty levels for tasks.
+### 🌐 **Frontend (Next.js 14)**
+- **Modern Web Interface**: Complete React-based UI with TypeScript
+- **Authentication System**: User registration, login, and JWT token management
+- **Question Browser**: Browse and filter prompting challenges by difficulty and language
+- **Interactive Submission Interface**: Real-time prompt submission with AI response display
+- **Evaluation Dashboard**: Comprehensive view of expert evaluations and feedback
+- **Responsive Design**: Mobile-friendly interface with Tailwind CSS
+
+### 🚀 **Backend (FastAPI)**
+- **RESTful API**: Complete REST endpoints for all application functionality
+- **Authentication**: JWT-based user authentication and authorization
+- **Database Integration**: MySQL support with Redis caching for performance
+- **LLM Integration**: OpenAI API integration for real-time code generation
+- **Structured Evaluation**: Comprehensive evaluation recording and retrieval
+
+### 🗄️ **Database & Storage**
+- **MySQL Database**: Scalable relational database for production use
+- **Redis Cache**: High-performance caching for API responses
+- **File Storage**: Organized submission and evaluation result storage
+- **Docker Support**: Full containerization for easy deployment
+
+### 🔧 **Development Features**
+- **Docker Compose**: Complete development environment setup
+- **Hot Reloading**: Frontend and backend auto-reload during development
+- **TypeScript**: Full type safety across the application
+- **API Documentation**: Auto-generated interactive API docs
+- **Unit Testing**: Comprehensive test suite with reporting
 
 ## User Stories
 
@@ -51,115 +71,190 @@ The following personas and goals guide PromptCraft's design:
 
 ## General Architecture
 
-PromptCraft's architecture includes:
+PromptCraft's modern full-stack architecture includes:
 
-- **FastAPI Backend (`api/`)**:
-  - Serves RESTful API endpoints for all application functionalities.
-  - Uses Pydantic for data validation.
-  - Organised into routers for questions, submissions, and evaluations.
-- **Core Logic (`promptcraft/`)**:
-  - `DatabaseHandler`: Manages interactions with SQLite databases.
-  - `TaskHandler`: Handles task presentation logic and submission recording.
-  - `Evaluator`: Manages evaluation recording.
-  - `cli.py`: The command-line interface for assessments.
-- **Next.js Frontend (`frontend/`) (Planned)**:
-  - Will consume the FastAPI backend to provide a user-friendly web interface.
-- **SQLite Databases**:
-  - `promptcraft_questions.db`: For assessment tasks (used by both CLI and API).
-  - `exam_questions.db`: For exam questions extracted from Markdown prompts in `./prompts/`.
-- **Initialization Scripts**:
-  - `initialize_database.py`: Seeds initial coding tasks into `promptcraft_questions.db`.
-  - `exam_init.py`: Extracts exam questions from `./prompts/` into `exam_questions.db`.
-- **Dockerfile**:
-  - For containerized deployment (to be updated for API and frontend).
-- **Output Directories**:
-  - `candidate_submissions/`: Stores candidate's prompts and LLM generated code.
-  - `evaluation_results/`: Stores evaluation data in JSON format.
+### 🖥️ **Frontend (`frontend/`)**
+- **Next.js 14** with App Router and TypeScript
+- **State Management**: Zustand for global state and user sessions
+- **UI Components**: Custom component library with Tailwind CSS
+- **API Integration**: Axios client with automatic token management
+- **Routing**: Protected routes with authentication middleware
+- **Forms**: React Hook Form with validation
+- **Notifications**: Toast notifications for user feedback
 
-## Workflow
+### 🔧 **Backend (`api/`)**
+- **FastAPI Framework**: Modern Python web framework with automatic API docs
+- **Authentication**: JWT-based auth with bcrypt password hashing
+- **Database**: MySQL with connection pooling and health checks
+- **Caching**: Redis for high-performance API response caching
+- **API Routers**: Organized endpoints for auth, questions, submissions, evaluations
+- **Error Handling**: Structured exception handling with logging
 
-The primary workflow is moving towards a web-based interaction via the planned Next.js frontend and the FastAPI backend. The traditional CLI workflow is also available.
+### 📊 **Core Logic (`promptcraft/`)**
+- **DatabaseHandler**: MySQL database operations with connection management
+- **TaskHandler**: Task presentation and submission recording logic
+- **Evaluator**: Evaluation recording and retrieval system
+- **Authentication Utils**: JWT token management and password utilities
+- **Redis Cache**: Caching layer for improved performance
 
-**1. Setup & Initialization (Common for all workflows):**
-   - Install dependencies:
-     ```bash
-     pip install -r requirements.txt
-     ```
-   - Initialize the task database:
-     ```bash
-     python initialize_database.py
-     ```
-   - (Optional) Generate exam questions:
-     ```bash
-     python exam_init.py
-     ```
+### 🗄️ **Database & Storage**
+- **MySQL Database**: Production-ready relational database
+- **Redis Cache**: In-memory caching for API responses
+- **File Storage**: Organized directory structure for submissions and evaluations
+- **Volume Persistence**: Docker volumes for data persistence
 
-**2. API-driven Workflow (New):**
-   - Start the FastAPI backend:
-     ```bash
-     uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
-     ```
-     (Ensure `OPENAI_API_KEY` environment variable is set for real LLM interaction, otherwise it will use simulations.)
-   - Interact with the API endpoints (e.g., using a tool like Postman/Insomnia, or the planned Next.js frontend):
-     - `GET /api/v1/questions` to list tasks.
-     - `POST /api/v1/submissions` to submit a prompt for a task.
-     - `POST /api/v1/evaluations` to submit an evaluation.
-   - Review candidate prompts in `candidate_submissions/` and evaluation results in `evaluation_results/`.
+### 🐳 **Docker Infrastructure**
+- **Multi-stage Dockerfiles**: Optimized for development and production
+- **Docker Compose**: Complete stack orchestration
+- **Health Checks**: Service health monitoring
+- **Environment Configuration**: Flexible environment variable management
+- **Volume Management**: Persistent data storage
 
-**3. CLI Workflow (Legacy):**
-   - Run an assessment:
-     ```bash
-     python -m promptcraft.cli --candidate <ID>
-     ```
-     (Ensure `OPENAI_API_KEY` environment variable is set for real LLM interaction if desired, otherwise it will use simulations.)
-   - Review candidate prompts in `candidate_submissions/` and evaluation results in `evaluation_results/`.
+## 🚀 Quick Start
 
-## Deployment
+### Prerequisites
+- Docker and Docker Compose
+- Git
+- At least 4GB RAM
+- Ports 3000, 8000, 3307, 6379 available
 
-**Local Development:**
+### 1. Clone and Setup
+```bash
+git clone <repository-url>
+cd PromptCraft
 
-- **Backend (FastAPI)**:
-  ```bash
-  pip install -r requirements.txt
-  # Initialize databases (if not already done)
-  python initialize_database.py
-  # python exam_init.py # Optional
-  # Set OPENAI_API_KEY (optional, for real LLM responses)
-  export OPENAI_API_KEY='your_openai_api_key_here' 
-  uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
-  ```
-- **Frontend (Next.js - Planned)**:
-  Instructions will be added once the frontend is developed. Typically:
-  ```bash
-  cd frontend
-  npm install
-  npm run dev
-  ```
-- **CLI (Legacy)**:
-  ```bash
-  pip install -r requirements.txt
-  python initialize_database.py
-  # Set OPENAI_API_KEY (optional)
-  export OPENAI_API_KEY='your_openai_api_key_here'
-  python -m promptcraft.cli --candidate alice
-  ```
-
-**Docker (To be updated):**
-The current Dockerfile is for the CLI version. It will be updated to support the FastAPI backend and Next.js frontend.
-
-## Example
-
-Example session (interactive):
-```text
---- Task 1 ---
-Write a Python function that calculates the factorial of a number.
-
-Please provide the prompt you would use to instruct an LLM to generate the code:
-> I want a Python function factorial(n) that handles negative input with ValueError.
-
-Submission recorded in 'candidate_submissions/alice_task1_20250427_044145.txt'
-...
+# Create environment file
+cp .env.example .env
+# Edit .env with your settings (especially OPENAI_API_KEY)
 ```
+
+### 2. Launch with Docker (Recommended)
+```bash
+# Start the complete stack
+docker-compose up --build -d
+
+# Access the application
+# Frontend: http://localhost:3000
+# Backend API: http://localhost:8000
+# API Docs: http://localhost:8000/docs
+```
+
+### 3. Manual Setup (Development)
+```bash
+# Backend setup
+pip install -r requirements.txt
+python initialize_database.py
+export OPENAI_API_KEY='your_key_here'
+uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
+
+# Frontend setup (in another terminal)
+cd frontend
+npm install
+npm run dev
+```
+
+## User Workflows
+
+### 👤 **For Candidates**
+1. **Register/Login**: Create account or sign in at http://localhost:3000
+2. **Browse Questions**: Explore available prompting challenges
+3. **Submit Solutions**: Craft prompts and submit for AI code generation
+4. **View Results**: See AI-generated responses and expert evaluations
+
+### 👨‍💼 **For Evaluators**
+1. **Access Dashboard**: Login to view submitted solutions
+2. **Review Submissions**: Examine candidate prompts and AI responses
+3. **Provide Evaluations**: Score and provide detailed feedback
+4. **Track Progress**: Monitor evaluation completion and results
+
+### 🔧 **For Administrators**
+1. **Manage Questions**: Add, edit, or remove assessment tasks
+2. **User Management**: Handle user accounts and permissions
+3. **System Monitoring**: Monitor application health and performance
+4. **Data Export**: Extract evaluation data for analysis
+
+## 🐳 Docker Deployment
+
+### Development Environment
+```bash
+# Start all services with hot-reloading
+docker-compose up --build -d
+
+# View logs
+docker-compose logs -f
+
+# Stop services
+docker-compose down
+```
+
+### Production Environment
+```bash
+# Set production environment variables
+export NEXT_PUBLIC_API_URL_PROD=https://your-domain.com/api/v1
+export MYSQL_ROOT_PASSWORD_PROD=your_secure_password
+export MYSQL_PASSWORD_PROD=your_secure_password
+
+# Deploy production stack
+docker-compose -f docker-compose.prod.yml up --build -d
+```
+
+### Individual Services
+```bash
+# Frontend only
+docker-compose up frontend -d
+
+# Backend only
+docker-compose up backend mysql_db redis_cache -d
+
+# Database services only
+docker-compose up mysql_db redis_cache -d
+```
+
+### Troubleshooting
+- **Port conflicts**: Check `.env` file and modify ports if needed
+- **Database issues**: Run `docker-compose down -v` to reset volumes
+- **Build issues**: Use `docker-compose build --no-cache`
+- **Logs**: Check `docker-compose logs [service-name]`
+
+For detailed troubleshooting, see `DOCKER_SETUP.md`.
+
+## 📱 Application Screenshots
+
+### Dashboard
+![Dashboard](frontend/public/dashboard-preview.png)
+*Main dashboard with navigation to all features*
+
+### Question Browser
+![Questions](frontend/public/questions-preview.png)
+*Browse and filter prompting challenges*
+
+### Submission Interface
+![Submission](frontend/public/submission-preview.png)
+*Interactive prompt submission with AI response*
+
+### Evaluation Dashboard
+![Evaluations](frontend/public/evaluations-preview.png)
+*Expert evaluations and detailed feedback*
+
+## API Endpoints
+
+### Authentication
+- `POST /api/v1/auth/register` - User registration
+- `POST /api/v1/auth/login` - User login
+- `GET /api/v1/auth/users/me` - Get current user
+
+### Questions
+- `GET /api/v1/questions` - List all questions
+- `GET /api/v1/questions/{id}` - Get question details
+
+### Submissions
+- `POST /api/v1/submissions` - Submit a prompt solution
+
+### Evaluations
+- `POST /api/v1/evaluations/candidate/{id}/task/{task_id}` - Create evaluation
+- `GET /api/v1/evaluations/candidate/{id}` - Get candidate evaluations
+
+Full API documentation available at `/docs` when running the backend.
 
 ## Unit Test Report
 
@@ -169,42 +264,42 @@ The latest unit test report summary (see `unit_test_report.md`):
 7 passed in 0.15s
 ```
 
-## Getting Started
+## 🎯 Features
 
-1.  Clone this repository.
-2.  **Install Python dependencies**:
-    ```bash
-    pip install -r requirements.txt
-    ```
-3.  **Initialize Databases**:
-    - Run the initialization script for assessment tasks:
-      ```bash
-      python initialize_database.py
-      ```
-    - (Optional) Generate and initialize the exam question database:
-      ```bash
-      python exam_init.py
-      ```
-      This creates `exam_questions.db` from Markdown files in `./prompts/`.
-4.  **Run the Application**:
+### 🔐 **Authentication & User Management**
+- Secure user registration and login
+- JWT-based authentication
+- Password hashing with bcrypt
+- Email verification system
+- Protected routes and API endpoints
 
-    - **FastAPI Backend (Recommended for new development)**:
-      Set your `OPENAI_API_KEY` environment variable if you want to use the actual OpenAI LLM:
-      ```bash
-      export OPENAI_API_KEY='your_actual_openai_api_key'
-      ```
-      Then run the Uvicorn server:
-      ```bash
-      uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
-      ```
-      You can access the API at `http://localhost:8000` and the auto-generated documentation at `http://localhost:8000/docs`.
+### 📚 **Question Management**
+- Browse prompting challenges by difficulty
+- Filter by programming language
+- Detailed question descriptions
+- Evaluation criteria display
+- Question metadata (difficulty, language, etc.)
 
-    - **CLI (Legacy)**:
-      (Optional) Set `OPENAI_API_KEY` as above.
-      ```bash
-      python -m promptcraft.cli --candidate your_candidate_id
-      ```
-5.  **(Planned)** Set up and run the Next.js frontend (details to come).
+### 💻 **Interactive Submission System**
+- Real-time prompt submission interface
+- AI code generation via OpenAI API
+- Submission history tracking
+- Response formatting and display
+- Character counting and validation
+
+### 📊 **Evaluation & Feedback**
+- Expert evaluation interface
+- Structured scoring system
+- Detailed feedback comments
+- Evaluation criteria tracking
+- Progress monitoring
+
+### 🎨 **Modern UI/UX**
+- Responsive design for all devices
+- Clean, professional interface
+- Real-time notifications
+- Loading states and error handling
+- Accessible components
 
 ## Use Cases
 
@@ -213,18 +308,44 @@ The latest unit test report summary (see `unit_test_report.md`):
 - Training and skill development for prompt engineering
 - Evaluating team members' ability to work effectively with AI tools
 
-## Running with Docker
+## 🧪 Testing
 
-The Docker setup will be updated to support the new FastAPI backend and the planned Next.js frontend. The current Dockerfile supports the legacy CLI application.
-
-**Legacy CLI Docker Instructions:**
+### Frontend Testing
 ```bash
-docker build -t promptcraft .
-docker run -it --rm \
-  -e CANDIDATE_ID=alice \
-  -v "$(pwd)/candidate_submissions:/app/candidate_submissions" \
-  -v "$(pwd)/evaluation_results:/app/evaluation_results" \
-  promptcraft
+cd frontend
+npm run test        # Run frontend tests
+npm run lint        # Check code quality
+npm run build       # Test production build
+```
+
+### Backend Testing
+```bash
+# Run Python unit tests
+python run_unit_tests.py
+
+# Run specific test files
+pytest tests/test_db_handler.py -v
+pytest tests/test_evaluator.py -v
+```
+
+### Integration Testing
+```bash
+# Test complete stack
+docker-compose up --build -d
+./test-frontend.sh
+
+# Test API endpoints
+curl http://localhost:8000/health
+curl http://localhost:8000/docs
+```
+
+### Performance Testing
+```bash
+# Test database performance
+docker-compose exec backend python -c "from promptcraft.database.db_handler import DatabaseHandler; print('DB connection test passed')"
+
+# Test Redis cache
+docker-compose exec redis_cache redis-cli ping
 ```
 
 ## Software Licensing and Commercialization Plan

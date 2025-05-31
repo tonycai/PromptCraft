@@ -7,7 +7,6 @@ WORKDIR /app
 COPY package.json package-lock.json* yarn.lock* ./
 
 # Install dependencies based on lock file
-# (Assumes Next.js project will be in a 'frontend' directory)
 RUN \
   if [ -f yarn.lock ]; then yarn install --frozen-lockfile; \
   elif [ -f package-lock.json ]; then npm ci; \
@@ -25,20 +24,42 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # Environment variables for build time (e.g., API URL)
-ENV NEXT_PUBLIC_API_URL="http://localhost:8000/api/v1"
-# For production, this should point to your actual backend URL
+# This will be overridden by docker-compose environment variables
+ARG NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 
 # Build the Next.js application
 RUN npm run build
 
-# Stage 3: Runner (Production)
-FROM node:18-alpine AS runner
+# Stage 3: Development (for docker-compose dev)
+FROM node:18-alpine AS development
+
+WORKDIR /app
+
+# Copy package.json and install dependencies
+COPY package.json package-lock.json* ./
+RUN npm ci
+
+# Copy source code
+COPY . .
+
+# Expose port
+EXPOSE 3000
+
+# Development command
+CMD ["npm", "run", "dev"]
+
+# Stage 4: Runner (Production)
+FROM node:18-alpine AS production
 
 WORKDIR /app
 
 # Create a non-root user
 RUN addgroup -g 1001 -S nodejs
 RUN adduser -S nextjs -u 1001
+
+# Install curl for healthcheck
+RUN apk add --no-cache curl
 
 # Copy built application from builder stage (standalone output)
 COPY --from=builder /app/.next/standalone ./ 
@@ -49,13 +70,11 @@ USER nextjs
 
 EXPOSE 3000
 
-ENV PORT 3000
-ENV HOSTNAME "0.0.0.0"
-# ENV NEXT_PUBLIC_API_URL will be passed through or set here again if needed for runtime
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
 
 # Healthcheck
-HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-  CMD wget -q --spider http://localhost:${PORT}/ || exit 1
-  # Adjust path if you have a specific health check page in Next.js
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD curl -f http://localhost:${PORT}/ || exit 1
 
 CMD ["node", "server.js"] 
