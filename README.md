@@ -184,9 +184,11 @@ npm run dev
 3. **System Monitoring**: Monitor application health and performance
 4. **Data Export**: Extract evaluation data for analysis
 
-## 🐳 Docker Deployment
+## 🚀 Deployment
 
-### Development Environment
+### 🐳 Docker Deployment (Recommended)
+
+#### Development Environment
 ```bash
 # Start all services with hot-reloading
 docker-compose up --build -d
@@ -198,7 +200,7 @@ docker-compose logs -f
 docker-compose down
 ```
 
-### Production Environment
+#### Production Environment
 ```bash
 # Set production environment variables
 export NEXT_PUBLIC_API_URL_PROD=https://your-domain.com/api/v1
@@ -209,7 +211,7 @@ export MYSQL_PASSWORD_PROD=your_secure_password
 docker-compose -f docker-compose.prod.yml up --build -d
 ```
 
-### Individual Services
+#### Individual Services
 ```bash
 # Frontend only
 docker-compose up frontend -d
@@ -221,11 +223,240 @@ docker-compose up backend mysql_db redis_cache -d
 docker-compose up mysql_db redis_cache -d
 ```
 
-### Troubleshooting
+### ☁️ Cloud Platform Deployment
+
+#### AWS Deployment
+```bash
+# Using AWS ECS with Docker Compose
+# 1. Install AWS CLI and Docker Compose CLI
+curl -L https://raw.githubusercontent.com/docker/compose-cli/main/scripts/install/install_linux.sh | sh
+
+# 2. Create ECS context
+docker context create ecs myecscontext
+
+# 3. Deploy to ECS
+docker --context myecscontext compose up
+```
+
+#### Google Cloud Platform
+```bash
+# Using Cloud Run
+# 1. Build and push images
+gcloud builds submit --tag gcr.io/PROJECT-ID/promptcraft-backend
+gcloud builds submit --tag gcr.io/PROJECT-ID/promptcraft-frontend
+
+# 2. Deploy services
+gcloud run deploy promptcraft-backend --image gcr.io/PROJECT-ID/promptcraft-backend --platform managed
+gcloud run deploy promptcraft-frontend --image gcr.io/PROJECT-ID/promptcraft-frontend --platform managed
+```
+
+#### Azure Container Instances
+```bash
+# Using Azure Container Instances
+# 1. Create resource group
+az group create --name promptcraft-rg --location eastus
+
+# 2. Deploy container group
+az container create --resource-group promptcraft-rg --file docker-compose.prod.yml
+```
+
+#### DigitalOcean App Platform
+```bash
+# Using doctl CLI
+# 1. Create app specification
+doctl apps create --spec .do/app.yaml
+
+# 2. Deploy updates
+doctl apps create-deployment <app-id>
+```
+
+### 🔧 Manual Deployment
+
+#### Server Requirements
+- **OS**: Ubuntu 20.04+ / CentOS 8+ / Amazon Linux 2
+- **Memory**: Minimum 4GB RAM (8GB recommended)
+- **Storage**: 20GB+ available disk space
+- **Ports**: 80, 443, 3000, 8000, 3306, 6379
+
+#### Step 1: Server Setup
+```bash
+# Update system
+sudo apt update && sudo apt upgrade -y
+
+# Install Docker
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
+sudo usermod -aG docker $USER
+
+# Install Docker Compose
+sudo curl -L "https://github.com/docker/compose/releases/download/v2.20.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+sudo chmod +x /usr/local/bin/docker-compose
+
+# Install Git
+sudo apt install git -y
+```
+
+#### Step 2: Application Deployment
+```bash
+# Clone repository
+git clone <your-repository-url>
+cd PromptCraft
+
+# Setup environment
+cp .env.example .env
+nano .env  # Configure your environment variables
+
+# Deploy with SSL (using Traefik or nginx-proxy)
+docker-compose -f docker-compose.prod.yml up -d
+```
+
+#### Step 3: SSL Configuration
+```bash
+# Using Let's Encrypt with Certbot
+sudo apt install certbot python3-certbot-nginx -y
+sudo certbot --nginx -d your-domain.com
+
+# Or using Traefik (recommended for Docker)
+# Add labels to docker-compose.prod.yml:
+# - "traefik.enable=true"
+# - "traefik.http.routers.promptcraft.rule=Host(`your-domain.com`)"
+# - "traefik.http.routers.promptcraft.tls.certresolver=letsencrypt"
+```
+
+### 🌐 Production Environment Configuration
+
+#### Environment Variables
+```bash
+# Production .env configuration
+NODE_ENV=production
+NEXT_PUBLIC_API_URL=https://your-domain.com/api/v1
+OPENAI_API_KEY=your_openai_api_key
+
+# Database Configuration
+MYSQL_ROOT_PASSWORD=your_secure_root_password
+MYSQL_DATABASE=promptcraft_prod
+MYSQL_USER=promptcraft_user
+MYSQL_PASSWORD=your_secure_password
+
+# Redis Configuration
+REDIS_URL=redis://redis_cache:6379
+
+# Security
+JWT_SECRET_KEY=your_jwt_secret_key_min_32_chars
+BCRYPT_ROUNDS=12
+
+# Monitoring
+LOG_LEVEL=INFO
+SENTRY_DSN=your_sentry_dsn_for_error_tracking
+```
+
+#### Database Backup Strategy
+```bash
+# Automated MySQL backups
+# Create backup script
+cat > backup.sh << 'EOF'
+#!/bin/bash
+DATE=$(date +%Y%m%d_%H%M%S)
+docker exec mysql_db mysqldump -u root -p$MYSQL_ROOT_PASSWORD promptcraft_prod > backup_$DATE.sql
+aws s3 cp backup_$DATE.sql s3://your-backup-bucket/
+rm backup_$DATE.sql
+EOF
+
+# Schedule with cron
+crontab -e
+# Add: 0 2 * * * /path/to/backup.sh
+```
+
+#### Monitoring and Health Checks
+```bash
+# Health check endpoints
+curl https://your-domain.com/api/v1/health
+curl https://your-domain.com/_next/static/health
+
+# Log monitoring
+docker-compose logs -f --tail=100
+
+# Resource monitoring
+docker stats
+```
+
+### 🔒 Security Best Practices
+
+#### Firewall Configuration
+```bash
+# UFW firewall setup
+sudo ufw enable
+sudo ufw allow ssh
+sudo ufw allow 80
+sudo ufw allow 443
+sudo ufw deny 3306  # Deny direct database access
+sudo ufw deny 6379  # Deny direct Redis access
+```
+
+#### Container Security
+```bash
+# Run containers as non-root user
+# Use secrets management
+docker secret create mysql_root_password mysql_root_pass.txt
+docker secret create jwt_secret jwt_secret.txt
+
+# Regular security updates
+docker system prune -f
+docker-compose pull
+docker-compose up -d
+```
+
+### 📊 Performance Optimization
+
+#### Production Optimizations
+```bash
+# Enable production optimizations in docker-compose.prod.yml
+# - Multi-stage builds for smaller images
+# - Resource limits and reservations
+# - Health checks with proper intervals
+# - Restart policies for high availability
+
+# Database optimization
+# - Connection pooling
+# - Query optimization
+# - Index optimization
+# - Read replicas for scaling
+```
+
+#### CDN Configuration
+```bash
+# CloudFlare setup for static assets
+# 1. Point DNS to your server
+# 2. Enable CloudFlare proxy
+# 3. Configure caching rules for /static/ paths
+# 4. Enable compression and minification
+```
+
+### 🚨 Troubleshooting
+
+#### Common Issues
 - **Port conflicts**: Check `.env` file and modify ports if needed
 - **Database issues**: Run `docker-compose down -v` to reset volumes
 - **Build issues**: Use `docker-compose build --no-cache`
-- **Logs**: Check `docker-compose logs [service-name]`
+- **SSL issues**: Check certificate renewal with `sudo certbot renew --dry-run`
+- **Memory issues**: Increase server resources or optimize container limits
+
+#### Debug Commands
+```bash
+# Check service status
+docker-compose ps
+docker-compose logs [service-name]
+
+# Database connectivity
+docker-compose exec backend python -c "from promptcraft.database.db_handler import DatabaseHandler; print('DB OK')"
+
+# Redis connectivity
+docker-compose exec redis_cache redis-cli ping
+
+# Network debugging
+docker network ls
+docker-compose exec frontend curl http://backend:8000/health
+```
 
 For detailed troubleshooting, see `DOCKER_SETUP.md`.
 
