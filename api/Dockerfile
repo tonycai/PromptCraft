@@ -22,6 +22,9 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# Install curl for health checks
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
 # Create a non-root user and group
 RUN groupadd -r appuser && useradd --no-log-init -r -g appuser appuser
 
@@ -61,10 +64,9 @@ USER appuser
 # Expose port
 EXPOSE 8000
 
-# Healthcheck (FastAPI typically has a root path)
-# This assumes your root path or a dedicated /health path returns 200 OK
+# Healthcheck using the dedicated /health endpoint
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:${PORT}/ || exit 1
+  CMD curl -f http://localhost:${PORT}/health || exit 1
 
 # Command to run the application using Gunicorn with Uvicorn workers
 # The database initialization should ideally happen before the app starts or via an entrypoint script.

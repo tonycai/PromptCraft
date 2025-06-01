@@ -45,3 +45,6 @@ htmlcov/
 .pytest_cache/
 changes.log
 prompts
+backups/
+*.log
+.env

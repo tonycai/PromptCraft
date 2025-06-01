@@ -1,6 +1,7 @@
 import logging
 import sys
 import os
+from logging.handlers import RotatingFileHandler
 
 # Determine log level from environment variable, default to INFO
 LOG_LEVEL_STR = os.getenv("LOG_LEVEL", "INFO").upper()
@@ -31,14 +32,38 @@ def setup_logger(name="promptcraft"):
         console_handler.setFormatter(formatter)
         logger.addHandler(console_handler)
 
-        # Optional: File Handler (Uncomment and configure if needed)
-        # log_file_path = os.getenv("LOG_FILE_PATH", "promptcraft_app.log")
-        # if os.getenv("ENABLE_FILE_LOGGING", "false").lower() == "true":
-        #     file_handler = logging.FileHandler(log_file_path)
-        #     file_handler.setLevel(LOG_LEVEL)
-        #     file_handler.setFormatter(formatter)
-        #     logger.addHandler(file_handler)
-        #     logger.info(f"File logging enabled. Log file: {log_file_path}")
+        # File Handler with Rotation
+        log_dir = os.getenv("LOG_DIR", "/app/logs")
+        log_file_path = os.path.join(log_dir, f"{name}.log")
+        
+        # Create log directory if it doesn't exist
+        os.makedirs(log_dir, exist_ok=True)
+        
+        if os.getenv("ENABLE_FILE_LOGGING", "true").lower() == "true":
+            # Use RotatingFileHandler to prevent log files from getting too large
+            file_handler = RotatingFileHandler(
+                log_file_path,
+                maxBytes=10*1024*1024,  # 10MB per file
+                backupCount=5,          # Keep 5 backup files
+                encoding='utf-8'
+            )
+            file_handler.setLevel(LOG_LEVEL)
+            file_handler.setFormatter(formatter)
+            logger.addHandler(file_handler)
+            logger.info(f"File logging enabled. Log file: {log_file_path} (max 10MB, 5 backups)")
+            
+            # Also create an error-only log file
+            error_log_path = os.path.join(log_dir, f"{name}_errors.log")
+            error_handler = RotatingFileHandler(
+                error_log_path,
+                maxBytes=5*1024*1024,   # 5MB per file
+                backupCount=3,          # Keep 3 backup files
+                encoding='utf-8'
+            )
+            error_handler.setLevel(logging.ERROR)
+            error_handler.setFormatter(formatter)
+            logger.addHandler(error_handler)
+            logger.info(f"Error logging enabled. Error file: {error_log_path} (max 5MB, 3 backups)")
 
     # logger.propagate = False # Be careful with this in web frameworks, 
                                 # as it might stop uvicorn/FastAPI from logging requests.

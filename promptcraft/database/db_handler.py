@@ -33,7 +33,8 @@ class DatabaseHandler:
                 host=self.db_host,
                 user=self.db_user,
                 password=self.db_password,
-                port=self.db_port
+                port=self.db_port,
+                auth_plugin='caching_sha2_password'
             )
             logger.debug(f"Successfully connected to MySQL server at {self.db_host}:{self.db_port}")
             return conn
@@ -70,7 +71,8 @@ class DatabaseHandler:
                 user=self.db_user,
                 password=self.db_password,
                 database=self.db_name,
-                port=self.db_port
+                port=self.db_port,
+                auth_plugin='caching_sha2_password'
             )
             if self.conn.is_connected():
                 logger.debug(f"Successfully connected to database '{self.db_name}'.")
@@ -140,6 +142,22 @@ class DatabaseHandler:
                     expires_at TIMESTAMP NOT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+            """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS submissions (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    user_id INT NOT NULL,
+                    question_id INT NOT NULL,
+                    prompt TEXT NOT NULL,
+                    generated_code TEXT,
+                    submission_file VARCHAR(255),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                    FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE,
+                    INDEX idx_user_question (user_id, question_id),
+                    INDEX idx_created_at (created_at)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
             """)
             conn.commit()
@@ -428,4 +446,124 @@ class DatabaseHandler:
         finally:
             cursor.close()
             self.close()
-        return deleted 
+        return deleted
+
+    # Submission methods
+    def create_submission(self, user_id: int, question_id: int, prompt: str, 
+                         generated_code: Optional[str] = None, submission_file: Optional[str] = None) -> Optional[int]:
+        """Create a new submission record."""
+        conn = self.connect()
+        if not conn: return None
+        cursor = conn.cursor()
+        submission_id = None
+        try:
+            sql = """
+                INSERT INTO submissions (user_id, question_id, prompt, generated_code, submission_file)
+                VALUES (%s, %s, %s, %s, %s)
+            """
+            cursor.execute(sql, (user_id, question_id, prompt, generated_code, submission_file))
+            conn.commit()
+            submission_id = cursor.lastrowid
+            logger.info(f"Submission created with ID: {submission_id} for user {user_id}, question {question_id}")
+        except Error as e:
+            logger.error(f"Error creating submission for user {user_id}, question {question_id}: {e}")
+            conn.rollback()
+        finally:
+            cursor.close()
+            self.close()
+        return submission_id
+
+    def get_user_submissions(self, user_id: int, limit: int = 50, offset: int = 0) -> list:
+        """Get all submissions for a specific user."""
+        conn = self.connect()
+        if not conn: return []
+        cursor = conn.cursor(dictionary=True)
+        submissions = []
+        try:
+            sql = """
+                SELECT s.*, q.description as question_description
+                FROM submissions s
+                JOIN questions q ON s.question_id = q.id
+                WHERE s.user_id = %s
+                ORDER BY s.created_at DESC
+                LIMIT %s OFFSET %s
+            """
+            cursor.execute(sql, (user_id, limit, offset))
+            submissions = cursor.fetchall()
+            logger.debug(f"Retrieved {len(submissions)} submissions for user {user_id}")
+        except Error as e:
+            logger.error(f"Error getting submissions for user {user_id}: {e}")
+        finally:
+            cursor.close()
+            self.close()
+        return submissions
+
+    def get_question_submissions(self, question_id: int, limit: int = 50, offset: int = 0) -> list:
+        """Get all submissions for a specific question."""
+        conn = self.connect()
+        if not conn: return []
+        cursor = conn.cursor(dictionary=True)
+        submissions = []
+        try:
+            sql = """
+                SELECT s.*, u.username, u.email
+                FROM submissions s
+                JOIN users u ON s.user_id = u.id
+                WHERE s.question_id = %s
+                ORDER BY s.created_at DESC
+                LIMIT %s OFFSET %s
+            """
+            cursor.execute(sql, (question_id, limit, offset))
+            submissions = cursor.fetchall()
+            logger.debug(f"Retrieved {len(submissions)} submissions for question {question_id}")
+        except Error as e:
+            logger.error(f"Error getting submissions for question {question_id}: {e}")
+        finally:
+            cursor.close()
+            self.close()
+        return submissions
+
+    def get_submission_by_id(self, submission_id: int) -> Optional[Dict[str, Any]]:
+        """Get a specific submission by ID."""
+        conn = self.connect()
+        if not conn: return None
+        cursor = conn.cursor(dictionary=True)
+        submission = None
+        try:
+            sql = """
+                SELECT s.*, q.description as question_description, u.username, u.email
+                FROM submissions s
+                JOIN questions q ON s.question_id = q.id
+                JOIN users u ON s.user_id = u.id
+                WHERE s.id = %s
+            """
+            cursor.execute(sql, (submission_id,))
+            submission = cursor.fetchone()
+            if submission:
+                logger.debug(f"Retrieved submission {submission_id}")
+            else:
+                logger.debug(f"No submission found with ID {submission_id}")
+        except Error as e:
+            logger.error(f"Error getting submission {submission_id}: {e}")
+        finally:
+            cursor.close()
+            self.close()
+        return submission
+
+    def get_user_submission_count(self, user_id: int) -> int:
+        """Get total number of submissions for a user."""
+        conn = self.connect()
+        if not conn: return 0
+        cursor = conn.cursor()
+        count = 0
+        try:
+            cursor.execute("SELECT COUNT(*) FROM submissions WHERE user_id = %s", (user_id,))
+            result = cursor.fetchone()
+            count = result[0] if result else 0
+            logger.debug(f"User {user_id} has {count} submissions")
+        except Error as e:
+            logger.error(f"Error getting submission count for user {user_id}: {e}")
+        finally:
+            cursor.close()
+            self.close()
+        return count 

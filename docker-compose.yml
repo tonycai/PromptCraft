@@ -4,7 +4,7 @@ services:
   mysql_db:
     image: mysql:8.0
     container_name: promptcraft_mysql_dev
-    command: --default-authentication-plugin=mysql_native_password # For wider client compatibility
+    command: --default-authentication-plugin=caching_sha2_password # Recommended authentication plugin
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-supersecretroot}
@@ -75,6 +75,7 @@ services:
       - ./prompts:/app/prompts # For completeness, though not directly used by backend
       - ./candidate_submissions:/app/candidate_submissions 
       - ./evaluation_results:/app/evaluation_results
+      - backend_logs:/app/logs # Persistent log storage
       # .db file mounts are removed as MySQL is used
     ports:
       - "8000:8000"
@@ -91,6 +92,8 @@ services:
       - REDIS_HOST=redis_cache # Service name of Redis
       - REDIS_PORT=${REDIS_PORT:-6379}
       - LOG_LEVEL=${LOG_LEVEL:-INFO} # Added LOG_LEVEL for backend
+      - ENABLE_FILE_LOGGING=true # Enable file logging
+      - LOG_DIR=/app/logs # Log directory
       # OPENAI_API_KEY is expected from .env
     depends_on:
       mysql_db: # Backend depends on mysql_db service
@@ -119,7 +122,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
+      - NEXT_PUBLIC_API_URL=https://promptcraft-api.aiw3.ai/api/v1
       - CHOKIDAR_USEPOLLING=true # For hot-reloading in Docker
     depends_on:
       backend:
@@ -134,5 +137,6 @@ services:
 volumes:
   mysql_data_dev: # Named volume for MySQL data persistence
   redis_data_dev:
+  backend_logs: # Named volume for persistent backend logs
   node_modules_frontend: # Example if you want to name the anonymous volume
   next_build_frontend: # Example if you want to name the anonymous volume 

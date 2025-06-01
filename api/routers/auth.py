@@ -8,6 +8,7 @@ from promptcraft.schemas.auth_schemas import UserCreate, UserResponse, Token, Lo
 from promptcraft import auth_utils # Renamed from auth_utils to avoid conflict
 from promptcraft.exceptions import BadRequestException, NotFoundException
 from promptcraft.logger_config import setup_logger
+from promptcraft.email_service import email_service
 
 logger = setup_logger(__name__)
 router = APIRouter(prefix="/api/v1/auth", tags=["authentication"])
@@ -47,6 +48,13 @@ async def get_current_active_user(token: str = Depends(oauth2_scheme)) -> UserRe
     if not user_data.get("is_active"):
         logger.warning(f"User {user_data.get('username')} is inactive.")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user")
+    
+    if not user_data.get("is_verified"):
+        logger.warning(f"User {user_data.get('username')} has not verified their email address.")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Email address not verified. Please check your email and verify your account before accessing this resource."
+        )
     
     # Validate token type if you added it during creation
     # token_type = payload.get("type")
@@ -94,9 +102,21 @@ async def register_user(user_in: UserCreate) -> Any:
          raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="User created but could not be retrieved.")
 
     logger.info(f"User {user_in.username} registered successfully with ID: {user_id}.")
-    # Here you would typically trigger an email verification flow
-    # For now, we just return the user data.
-    # send_verification_email(created_user_data['email'], user_id) # Placeholder
+    
+    # Send verification email automatically
+    try:
+        verification_jwt = auth_utils.generate_email_verification_jwt(created_user_data['email'])
+        verification_link = f"https://promptcraft.aiw3.ai/verify-email?token={verification_jwt}"
+        
+        email_sent = email_service.send_verification_email(created_user_data['email'], verification_link)
+        if email_sent:
+            logger.info(f"Verification email sent successfully to {created_user_data['email']}")
+        else:
+            logger.error(f"Failed to send verification email to {created_user_data['email']}")
+            # Don't fail registration if email fails, but log the issue
+    except Exception as e:
+        logger.error(f"Error sending verification email for {created_user_data['email']}: {e}")
+        # Continue with registration even if email fails
 
     return UserResponse.model_validate(created_user_data) # Pydantic v2
 
@@ -116,6 +136,10 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     if not user_data.get("is_active"):
         logger.warning(f"Login failed for inactive user: {form_data.username}")
         raise BadRequestException(detail="Inactive user account.", status_code=status.HTTP_400_BAD_REQUEST)
+    
+    if not user_data.get("is_verified"):
+        logger.warning(f"Login failed for unverified user: {form_data.username}")
+        raise BadRequestException(detail="Email address not verified. Please check your email and verify your account before logging in.", status_code=status.HTTP_403_FORBIDDEN)
     
     # For JWT subject, use username or user_id. Using user_id is often better.
     # The 'sub' (subject) of the token. 
@@ -151,12 +175,19 @@ async def request_email_verification_link(request: EmailVerificationRequest):
     # expires_at = (datetime.now(timezone.utc) + timedelta(hours=auth_utils.EMAIL_VERIFICATION_TOKEN_EXPIRE_HOURS)).isoformat()
     # db_handler.create_email_verification_token(user_id=user['id'], token=verification_jwt, expires_at=expires_at)
 
-    # 3. Send email with Mailchimp/other (placeholder)
-    verification_link = f"http://localhost:3000/verify-email?token={verification_jwt}" # Example frontend URL
-    logger.info(f"Generated verification link for {request.email}: {verification_link} (Email sending is a placeholder)")
-    # mail_service.send_verification_email(user['email'], verification_link)
+    # 3. Send email with Mailchimp
+    verification_link = f"https://promptcraft.aiw3.ai/verify-email?token={verification_jwt}" # Frontend URL
+    logger.info(f"Generated verification link for {request.email}: {verification_link}")
+    
+    email_sent = email_service.send_verification_email(user['email'], verification_link)
+    if not email_sent:
+        logger.error(f"Failed to send verification email to {request.email}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to send verification email. Please try again later."
+        )
 
-    return {"message": "Verification email has been sent (placeholder)."}
+    return {"message": "Verification email has been sent successfully."}
 
 @router.post("/verify-email", response_model=Msg)
 async def verify_user_email(request: VerifyTokenRequest):

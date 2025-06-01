@@ -1,8 +1,11 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from api.routers import questions, submissions, evaluations, auth # Added auth router
 from promptcraft.exceptions import PromptCraftBaseException # Import base custom exception
 from promptcraft.logger_config import setup_logger # Import logger
+from promptcraft.error_handlers import setup_error_handlers
+from promptcraft.middleware import setup_middleware
 
 logger = setup_logger(__name__) # Setup logger for main API module
 
@@ -10,6 +13,18 @@ app = FastAPI(
     title="PromptCraft API",
     description="API for PromptCraft, a framework for assessing prompting proficiency.",
     version="0.2.0" # Example version
+)
+
+# Setup middleware (must be done before app starts)
+setup_middleware(app)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "https://promptcraft.aiw3.ai"],  # Frontend URLs
+    allow_credentials=True,
+    allow_methods=["*"],  # Allow all methods
+    allow_headers=["*"],  # Allow all headers
 )
 
 # Global Exception Handler for our custom exceptions
@@ -33,6 +48,9 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 @app.on_event("startup")
 async def startup_event():
     logger.info("PromptCraft API starting up...")
+    # Setup error handlers (middleware already set up above)
+    setup_error_handlers(app)
+    logger.info("Error handlers configured")
     # You can initialize DB connections, Redis connections here if using FastAPI dependencies
     # For now, they are initialized globally in their respective modules or when first used.
 

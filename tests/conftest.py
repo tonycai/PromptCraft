@@ -94,7 +94,7 @@ def test_db_session(setup_test_database, mysql_test_db_connection_details):
     conn = None
     cursor = None
     try:
-        conn = mysql.connector.connect(**details)
+        conn = mysql.connector.connect(auth_plugin='caching_sha2_password', **details)
         cursor = conn.cursor()
         logger.debug("Connected to test DB for test function.")
         yield conn # Not strictly necessary to yield conn if tests use the app's db_handler

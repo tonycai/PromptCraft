@@ -4,7 +4,7 @@ services:
   mysql_db_prod:
     image: mysql:8.0
     container_name: promptcraft_mysql_prod
-    command: --default-authentication-plugin=mysql_native_password
+    command: --default-authentication-plugin=caching_sha2_password
     restart: always
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD_PROD} # Must be set in prod env
@@ -73,6 +73,14 @@ services:
       - REDIS_HOST=redis_cache_prod # Connect to prod Redis service
       - REDIS_PORT=${REDIS_PORT_PROD:-6379}
       - LOG_LEVEL=${LOG_LEVEL_PROD:-INFO} # Added LOG_LEVEL for backend prod
+      - MAILCHIMP_API_KEY=${MAILCHIMP_API_KEY_PROD}
+      - MAILCHIMP_SERVER_PREFIX=${MAILCHIMP_SERVER_PREFIX_PROD:-us11}
+      - SMTP_HOST=${SMTP_HOST_PROD:-smtp.mandrillapp.com}
+      - SMTP_PORT=${SMTP_PORT_PROD:-587}
+      - SMTP_USERNAME=${SMTP_USERNAME_PROD}
+      - SMTP_PASSWORD=${SMTP_PASSWORD_PROD}
+      - SMTP_USE_TLS=${SMTP_USE_TLS_PROD:-True}
+      - FROM_EMAIL=${FROM_EMAIL_PROD:-noreply@promptcraft.aiw3.ai}
     depends_on:
       mysql_db_prod:
         condition: service_healthy

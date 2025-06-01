@@ -15,7 +15,9 @@ class TaskHandler:
         self.output_dir = output_dir
         # Create output directory if it doesn't exist
         if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
+            os.makedirs(output_dir, exist_ok=True)
+        # Ensure directory exists and is writable
+        os.makedirs(output_dir, exist_ok=True)
             
     def present_task(self, task_id, task_description):
         """Present a task to the candidate."""

@@ -8,12 +8,14 @@ import type {
   QuestionDetail,
   SubmissionRequest,
   SubmissionResponse,
+  SubmissionHistoryResponse,
+  SubmissionHistoryItem,
   EvaluationRequest,
   EvaluationResponse,
   ApiError,
 } from '@/types';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://promptcraft-api.aiw3.ai/api/v1';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -102,6 +104,18 @@ export const questionsApi = {
 export const submissionsApi = {
   create: async (data: SubmissionRequest): Promise<SubmissionResponse> => {
     const response = await api.post<SubmissionResponse>('/submissions', data);
+    return response.data;
+  },
+
+  getMySubmissions: async (page: number = 1, limit: number = 20): Promise<SubmissionHistoryResponse> => {
+    const response = await api.get<SubmissionHistoryResponse>('/submissions/my', {
+      params: { page, limit }
+    });
+    return response.data;
+  },
+
+  getSubmissionById: async (submissionId: number): Promise<SubmissionHistoryItem> => {
+    const response = await api.get<SubmissionHistoryItem>(`/submissions/${submissionId}`);
     return response.data;
   },
 };

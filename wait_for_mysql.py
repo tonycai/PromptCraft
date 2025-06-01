@@ -31,7 +31,8 @@ def wait_for_mysql():
                 user=mysql_user,
                 password=mysql_password,
                 database=mysql_database,
-                connection_timeout=5
+                connection_timeout=5,
+                auth_plugin='caching_sha2_password'
             )
             
             if connection.is_connected():

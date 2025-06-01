@@ -44,10 +44,27 @@ export interface SubmissionRequest {
 }
 
 export interface SubmissionResponse {
-  submission_file: string;
+  submission_id: number;
   generated_code: string;
   message: string;
   submitted_by_user_id: number;
+}
+
+export interface SubmissionHistoryItem {
+  id: number;
+  question_id: number;
+  question_description: string;
+  prompt: string;
+  generated_code: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SubmissionHistoryResponse {
+  submissions: SubmissionHistoryItem[];
+  total_count: number;
+  page: number;
+  limit: number;
 }
 
 export interface EvaluationRequest {

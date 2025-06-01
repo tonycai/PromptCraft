@@ -84,7 +84,7 @@ export default function SubmitQuestionPage() {
             </CardHeader>
             <CardContent>
               <p className="text-gray-600 mb-4">
-                Your prompt has been submitted and processed. Here's the AI-generated response:
+                Your prompt has been submitted and processed (Submission #{submissionResult.submission_id}). Here's the AI-generated response:
               </p>
               <div className="bg-gray-50 border rounded-lg p-4">
                 <h3 className="font-medium text-gray-900 mb-2">Generated Response:</h3>
