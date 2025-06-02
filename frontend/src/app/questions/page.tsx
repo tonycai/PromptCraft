@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useQuestions } from '@/hooks/useQuestions';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { SidebarLayout } from '@/components/layout/SidebarLayout';
 
 export default function QuestionsPage() {
   const { questions, loading, error } = useQuestions();
@@ -25,8 +26,8 @@ export default function QuestionsPage() {
   }
 
   return (
-    <div className="px-4 py-6 sm:px-0">
-      <div className="border-b border-gray-200 pb-5">
+    <SidebarLayout>
+      <div className="border-b border-gray-200 pb-5 animate-fade-in-down">
         <h1 className="text-2xl font-bold leading-6 text-gray-900">
           Practice Questions
         </h1>
@@ -57,8 +58,16 @@ export default function QuestionsPage() {
         </div>
       ) : (
         <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {questions.map((question) => (
-            <Card key={question.id} className="hover:shadow-md transition-shadow">
+          {questions.map((question, index) => (
+            <Card 
+              key={question.id} 
+              className={`hover:shadow-md transition-shadow hover-lift animate-fade-in-up ${
+                index === 0 ? 'animate-delay-100' : 
+                index === 1 ? 'animate-delay-200' : 
+                index === 2 ? 'animate-delay-300' : 
+                `animate-delay-${Math.min(400 + (index - 3) * 100, 800)}`
+              }`}
+            >
               <CardContent>
                 <h3 className="text-lg font-medium text-gray-900 mb-3">
                   Question #{question.id}
@@ -68,12 +77,12 @@ export default function QuestionsPage() {
                 </p>
                 <div className="flex justify-between items-center">
                   <Link href={`/questions/${question.id}`}>
-                    <Button size="sm">
+                    <Button size="sm" className="hover-lift">
                       View Details
                     </Button>
                   </Link>
                   <Link href={`/questions/${question.id}/submit`}>
-                    <Button variant="outline" size="sm">
+                    <Button variant="outline" size="sm" className="hover-lift">
                       Submit Solution
                     </Button>
                   </Link>
@@ -83,6 +92,6 @@ export default function QuestionsPage() {
           ))}
         </div>
       )}
-    </div>
+    </SidebarLayout>
   );
 }

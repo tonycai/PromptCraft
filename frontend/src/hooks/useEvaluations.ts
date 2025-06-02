@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { evaluationsApi } from '@/lib/api';
-import type { EvaluationRequest, EvaluationResponse } from '@/types';
+import type { EvaluationRequest, EvaluationResponse, EvaluationDetail } from '@/types';
 import { toast } from 'react-hot-toast';
 
 export function useEvaluations() {
@@ -28,7 +28,7 @@ export function useEvaluations() {
     }
   };
 
-  const getEvaluationsForCandidate = async (candidateId: string): Promise<any[] | null> => {
+  const getEvaluationsForCandidate = async (candidateId: string): Promise<EvaluationDetail[] | null> => {
     try {
       setLoading(true);
       setError(null);

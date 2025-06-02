@@ -128,6 +128,8 @@ class DatabaseHandler:
                     username VARCHAR(50) NOT NULL UNIQUE,
                     hashed_password VARCHAR(255) NOT NULL,
                     full_name VARCHAR(100),
+                    profile_photo_url TEXT,
+                    profile_photo_ipfs_hash VARCHAR(255),
                     is_active BOOLEAN DEFAULT TRUE,
                     is_verified BOOLEAN DEFAULT FALSE,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -160,6 +162,59 @@ class DatabaseHandler:
                     INDEX idx_created_at (created_at)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
             """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS evaluations (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    candidate_id VARCHAR(255) NOT NULL,
+                    task_id INT NOT NULL,
+                    submission_id INT NULL,
+                    evaluator_user_id INT NOT NULL,
+                    evaluator_username VARCHAR(50) NOT NULL,
+                    prompt_evaluated TEXT NOT NULL,
+                    generated_code_evaluated TEXT,
+                    evaluation_notes TEXT NOT NULL,
+                    evaluation_criteria_used JSON,
+                    scores JSON,
+                    overall_score DECIMAL(5,2) DEFAULT NULL,
+                    status ENUM('pending', 'completed', 'reviewed') DEFAULT 'completed',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    FOREIGN KEY (task_id) REFERENCES questions(id) ON DELETE CASCADE,
+                    FOREIGN KEY (submission_id) REFERENCES submissions(id) ON DELETE SET NULL,
+                    FOREIGN KEY (evaluator_user_id) REFERENCES users(id) ON DELETE CASCADE,
+                    INDEX idx_candidate_task (candidate_id, task_id),
+                    INDEX idx_evaluator (evaluator_user_id),
+                    INDEX idx_submission (submission_id),
+                    INDEX idx_created_at (created_at)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+            """)
+            
+            # Add profile photo columns if they don't exist (migration)
+            try:
+                cursor.execute("""
+                    ALTER TABLE users 
+                    ADD COLUMN IF NOT EXISTS profile_photo_url TEXT,
+                    ADD COLUMN IF NOT EXISTS profile_photo_ipfs_hash VARCHAR(255)
+                """)
+                logger.info("Profile photo columns added to users table (if they didn't exist).")
+            except Error as e:
+                # This might fail on some MySQL versions that don't support IF NOT EXISTS in ALTER TABLE
+                # Let's try a different approach
+                try:
+                    cursor.execute("DESCRIBE users")
+                    columns = [row[0] for row in cursor.fetchall()]
+                    
+                    if 'profile_photo_url' not in columns:
+                        cursor.execute("ALTER TABLE users ADD COLUMN profile_photo_url TEXT")
+                        logger.info("Added profile_photo_url column to users table.")
+                    
+                    if 'profile_photo_ipfs_hash' not in columns:
+                        cursor.execute("ALTER TABLE users ADD COLUMN profile_photo_ipfs_hash VARCHAR(255)")
+                        logger.info("Added profile_photo_ipfs_hash column to users table.")
+                        
+                except Error as migration_error:
+                    logger.warning(f"Could not add profile photo columns (they may already exist): {migration_error}")
+            
             conn.commit()
             logger.info(f"Tables in database '{self.db_name}' initialized.")
         except Error as e:
@@ -370,6 +425,60 @@ class DatabaseHandler:
             self.close()
         return user_data
 
+    def update_user(self, user_id: int, **kwargs) -> bool:
+        """Update user fields. Accepts any combination of updateable fields."""
+        conn = self.connect()
+        if not conn: 
+            return False
+        
+        cursor = conn.cursor()
+        updated = False
+        
+        # Define allowed fields for update
+        allowed_fields = {
+            'full_name', 'profile_photo_url', 'profile_photo_ipfs_hash', 
+            'email', 'username'  # Add email/username if needed, but be careful with uniqueness
+        }
+        
+        # Filter kwargs to only include allowed fields that are not None
+        update_fields = {k: v for k, v in kwargs.items() 
+                        if k in allowed_fields and v is not None}
+        
+        if not update_fields:
+            logger.warning(f"No valid fields provided for user {user_id} update.")
+            self.close()
+            return False
+        
+        try:
+            # Build dynamic SQL
+            set_clauses = [f"{field} = %s" for field in update_fields.keys()]
+            sql = f"""
+                UPDATE users 
+                SET {', '.join(set_clauses)}, updated_at = CURRENT_TIMESTAMP 
+                WHERE id = %s
+            """
+            
+            # Prepare values (field values + user_id)
+            values = list(update_fields.values()) + [user_id]
+            
+            cursor.execute(sql, values)
+            conn.commit()
+            
+            if cursor.rowcount > 0:
+                logger.info(f"User ID {user_id} updated successfully. Fields: {list(update_fields.keys())}")
+                updated = True
+            else:
+                logger.warning(f"Attempted to update user ID {user_id}, but user not found or no change needed.")
+                
+        except Error as e:
+            logger.error(f"Error updating user ID {user_id}: {e}")
+            conn.rollback()
+        finally:
+            cursor.close()
+            self.close()
+            
+        return updated
+
     # Add methods for email verification tokens
     def create_email_verification_token(self, user_id: int, token: str, expires_at: str) -> Optional[int]:
         conn = self.connect()
@@ -566,4 +675,369 @@ class DatabaseHandler:
         finally:
             cursor.close()
             self.close()
-        return count 
+        return count
+
+    # Evaluation methods
+    def create_evaluation(self, candidate_id: str, task_id: int, evaluator_user_id: int, 
+                         evaluator_username: str, prompt_evaluated: str, 
+                         generated_code_evaluated: Optional[str] = None, 
+                         evaluation_notes: str = "", evaluation_criteria_used: Optional[Dict[str, Any]] = None,
+                         scores: Optional[Dict[str, Any]] = None, submission_id: Optional[int] = None,
+                         overall_score: Optional[float] = None, status: str = "completed") -> Optional[int]:
+        """Create a new evaluation record."""
+        conn = self.connect()
+        if not conn: return None
+        cursor = conn.cursor()
+        evaluation_id = None
+        try:
+            sql = """
+                INSERT INTO evaluations (
+                    candidate_id, task_id, submission_id, evaluator_user_id, evaluator_username,
+                    prompt_evaluated, generated_code_evaluated, evaluation_notes, 
+                    evaluation_criteria_used, scores, overall_score, status
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """
+            # Convert dicts to JSON strings
+            criteria_json = json.dumps(evaluation_criteria_used) if evaluation_criteria_used else None
+            scores_json = json.dumps(scores) if scores else None
+            
+            cursor.execute(sql, (
+                candidate_id, task_id, submission_id, evaluator_user_id, evaluator_username,
+                prompt_evaluated, generated_code_evaluated, evaluation_notes,
+                criteria_json, scores_json, overall_score, status
+            ))
+            conn.commit()
+            evaluation_id = cursor.lastrowid
+            logger.info(f"Evaluation created with ID: {evaluation_id} for candidate {candidate_id}, task {task_id}")
+        except Error as e:
+            logger.error(f"Error creating evaluation for candidate {candidate_id}, task {task_id}: {e}")
+            conn.rollback()
+        finally:
+            cursor.close()
+            self.close()
+        return evaluation_id
+
+    def get_candidate_evaluations(self, candidate_id: str, limit: int = 50, offset: int = 0) -> list:
+        """Get all evaluations for a specific candidate."""
+        conn = self.connect()
+        if not conn: return []
+        cursor = conn.cursor(dictionary=True)
+        evaluations = []
+        try:
+            sql = """
+                SELECT 
+                    e.*,
+                    q.description as task_description,
+                    q.programming_language,
+                    q.difficulty_level,
+                    u.username as evaluator_username_full,
+                    u.full_name as evaluator_full_name
+                FROM evaluations e
+                LEFT JOIN questions q ON e.task_id = q.id
+                LEFT JOIN users u ON e.evaluator_user_id = u.id
+                WHERE e.candidate_id = %s
+                ORDER BY e.created_at DESC
+                LIMIT %s OFFSET %s
+            """
+            cursor.execute(sql, (candidate_id, limit, offset))
+            results = cursor.fetchall()
+            
+            for evaluation in results:
+                # Parse JSON fields
+                if evaluation.get('evaluation_criteria_used') and isinstance(evaluation['evaluation_criteria_used'], str):
+                    try:
+                        evaluation['evaluation_criteria_used'] = json.loads(evaluation['evaluation_criteria_used'])
+                    except json.JSONDecodeError:
+                        evaluation['evaluation_criteria_used'] = {}
+                
+                if evaluation.get('scores') and isinstance(evaluation['scores'], str):
+                    try:
+                        evaluation['scores'] = json.loads(evaluation['scores'])
+                    except json.JSONDecodeError:
+                        evaluation['scores'] = {}
+                
+                evaluations.append(evaluation)
+            
+            logger.debug(f"Retrieved {len(evaluations)} evaluations for candidate {candidate_id}")
+        except Error as e:
+            logger.error(f"Error getting evaluations for candidate {candidate_id}: {e}")
+        finally:
+            cursor.close()
+            self.close()
+        return evaluations
+
+    def get_evaluation_by_id(self, evaluation_id: int) -> Optional[Dict[str, Any]]:
+        """Get a specific evaluation by ID."""
+        conn = self.connect()
+        if not conn: return None
+        cursor = conn.cursor(dictionary=True)
+        evaluation = None
+        try:
+            sql = """
+                SELECT 
+                    e.*,
+                    q.description as task_description,
+                    q.programming_language,
+                    q.difficulty_level,
+                    u.username as evaluator_username_full,
+                    u.full_name as evaluator_full_name
+                FROM evaluations e
+                LEFT JOIN questions q ON e.task_id = q.id
+                LEFT JOIN users u ON e.evaluator_user_id = u.id
+                WHERE e.id = %s
+            """
+            cursor.execute(sql, (evaluation_id,))
+            evaluation = cursor.fetchone()
+            
+            if evaluation:
+                # Parse JSON fields
+                if evaluation.get('evaluation_criteria_used') and isinstance(evaluation['evaluation_criteria_used'], str):
+                    try:
+                        evaluation['evaluation_criteria_used'] = json.loads(evaluation['evaluation_criteria_used'])
+                    except json.JSONDecodeError:
+                        evaluation['evaluation_criteria_used'] = {}
+                
+                if evaluation.get('scores') and isinstance(evaluation['scores'], str):
+                    try:
+                        evaluation['scores'] = json.loads(evaluation['scores'])
+                    except json.JSONDecodeError:
+                        evaluation['scores'] = {}
+                
+                logger.debug(f"Retrieved evaluation {evaluation_id}")
+            else:
+                logger.debug(f"No evaluation found with ID {evaluation_id}")
+        except Error as e:
+            logger.error(f"Error getting evaluation {evaluation_id}: {e}")
+        finally:
+            cursor.close()
+            self.close()
+        return evaluation
+
+    def get_evaluations_by_task(self, task_id: int, limit: int = 50, offset: int = 0) -> list:
+        """Get all evaluations for a specific task."""
+        conn = self.connect()
+        if not conn: return []
+        cursor = conn.cursor(dictionary=True)
+        evaluations = []
+        try:
+            sql = """
+                SELECT 
+                    e.*,
+                    q.description as task_description,
+                    u.username as evaluator_username_full,
+                    u.full_name as evaluator_full_name
+                FROM evaluations e
+                LEFT JOIN questions q ON e.task_id = q.id
+                LEFT JOIN users u ON e.evaluator_user_id = u.id
+                WHERE e.task_id = %s
+                ORDER BY e.created_at DESC
+                LIMIT %s OFFSET %s
+            """
+            cursor.execute(sql, (task_id, limit, offset))
+            results = cursor.fetchall()
+            
+            for evaluation in results:
+                # Parse JSON fields
+                if evaluation.get('evaluation_criteria_used') and isinstance(evaluation['evaluation_criteria_used'], str):
+                    try:
+                        evaluation['evaluation_criteria_used'] = json.loads(evaluation['evaluation_criteria_used'])
+                    except json.JSONDecodeError:
+                        evaluation['evaluation_criteria_used'] = {}
+                
+                if evaluation.get('scores') and isinstance(evaluation['scores'], str):
+                    try:
+                        evaluation['scores'] = json.loads(evaluation['scores'])
+                    except json.JSONDecodeError:
+                        evaluation['scores'] = {}
+                
+                evaluations.append(evaluation)
+            
+            logger.debug(f"Retrieved {len(evaluations)} evaluations for task {task_id}")
+        except Error as e:
+            logger.error(f"Error getting evaluations for task {task_id}: {e}")
+        finally:
+            cursor.close()
+            self.close()
+        return evaluations
+
+    def get_evaluations_by_evaluator(self, evaluator_user_id: int, limit: int = 50, offset: int = 0) -> list:
+        """Get all evaluations by a specific evaluator."""
+        conn = self.connect()
+        if not conn: return []
+        cursor = conn.cursor(dictionary=True)
+        evaluations = []
+        try:
+            sql = """
+                SELECT 
+                    e.*,
+                    q.description as task_description,
+                    q.programming_language,
+                    q.difficulty_level
+                FROM evaluations e
+                LEFT JOIN questions q ON e.task_id = q.id
+                WHERE e.evaluator_user_id = %s
+                ORDER BY e.created_at DESC
+                LIMIT %s OFFSET %s
+            """
+            cursor.execute(sql, (evaluator_user_id, limit, offset))
+            results = cursor.fetchall()
+            
+            for evaluation in results:
+                # Parse JSON fields
+                if evaluation.get('evaluation_criteria_used') and isinstance(evaluation['evaluation_criteria_used'], str):
+                    try:
+                        evaluation['evaluation_criteria_used'] = json.loads(evaluation['evaluation_criteria_used'])
+                    except json.JSONDecodeError:
+                        evaluation['evaluation_criteria_used'] = {}
+                
+                if evaluation.get('scores') and isinstance(evaluation['scores'], str):
+                    try:
+                        evaluation['scores'] = json.loads(evaluation['scores'])
+                    except json.JSONDecodeError:
+                        evaluation['scores'] = {}
+                
+                evaluations.append(evaluation)
+            
+            logger.debug(f"Retrieved {len(evaluations)} evaluations by evaluator {evaluator_user_id}")
+        except Error as e:
+            logger.error(f"Error getting evaluations by evaluator {evaluator_user_id}: {e}")
+        finally:
+            cursor.close()
+            self.close()
+        return evaluations
+
+    def update_evaluation(self, evaluation_id: int, **kwargs) -> bool:
+        """Update evaluation fields."""
+        conn = self.connect()
+        if not conn: return False
+        
+        cursor = conn.cursor()
+        updated = False
+        
+        # Define allowed fields for update
+        allowed_fields = {
+            'evaluation_notes', 'scores', 'overall_score', 'status', 
+            'evaluation_criteria_used', 'prompt_evaluated', 'generated_code_evaluated'
+        }
+        
+        # Filter kwargs to only include allowed fields that are not None
+        update_fields = {k: v for k, v in kwargs.items() 
+                        if k in allowed_fields and v is not None}
+        
+        if not update_fields:
+            logger.warning(f"No valid fields provided for evaluation {evaluation_id} update.")
+            self.close()
+            return False
+        
+        try:
+            # Handle JSON fields
+            if 'scores' in update_fields and isinstance(update_fields['scores'], dict):
+                update_fields['scores'] = json.dumps(update_fields['scores'])
+            if 'evaluation_criteria_used' in update_fields and isinstance(update_fields['evaluation_criteria_used'], dict):
+                update_fields['evaluation_criteria_used'] = json.dumps(update_fields['evaluation_criteria_used'])
+            
+            # Build dynamic SQL
+            set_clauses = [f"{field} = %s" for field in update_fields.keys()]
+            sql = f"""
+                UPDATE evaluations 
+                SET {', '.join(set_clauses)}, updated_at = CURRENT_TIMESTAMP 
+                WHERE id = %s
+            """
+            
+            # Prepare values (field values + evaluation_id)
+            values = list(update_fields.values()) + [evaluation_id]
+            
+            cursor.execute(sql, values)
+            conn.commit()
+            
+            if cursor.rowcount > 0:
+                logger.info(f"Evaluation ID {evaluation_id} updated successfully. Fields: {list(update_fields.keys())}")
+                updated = True
+            else:
+                logger.warning(f"Attempted to update evaluation ID {evaluation_id}, but evaluation not found or no change needed.")
+                
+        except Error as e:
+            logger.error(f"Error updating evaluation ID {evaluation_id}: {e}")
+            conn.rollback()
+        finally:
+            cursor.close()
+            self.close()
+            
+        return updated
+
+    def delete_evaluation(self, evaluation_id: int) -> bool:
+        """Delete an evaluation."""
+        conn = self.connect()
+        if not conn: return False
+        cursor = conn.cursor()
+        deleted = False
+        try:
+            sql = "DELETE FROM evaluations WHERE id = %s"
+            cursor.execute(sql, (evaluation_id,))
+            conn.commit()
+            if cursor.rowcount > 0:
+                logger.info(f"Evaluation ID {evaluation_id} deleted.")
+                deleted = True
+            else:
+                logger.warning(f"No evaluation found with ID {evaluation_id} to delete.")
+        except Error as e:
+            logger.error(f"Error deleting evaluation {evaluation_id}: {e}")
+            conn.rollback()
+        finally:
+            cursor.close()
+            self.close()
+        return deleted
+
+    def get_evaluation_statistics(self) -> Dict[str, Any]:
+        """Get evaluation statistics."""
+        conn = self.connect()
+        if not conn: return {}
+        cursor = conn.cursor(dictionary=True)
+        stats = {}
+        try:
+            # Total evaluations
+            cursor.execute("SELECT COUNT(*) as total_evaluations FROM evaluations")
+            stats['total_evaluations'] = cursor.fetchone()['total_evaluations']
+            
+            # Evaluations by status
+            cursor.execute("""
+                SELECT status, COUNT(*) as count 
+                FROM evaluations 
+                GROUP BY status
+            """)
+            stats['by_status'] = {row['status']: row['count'] for row in cursor.fetchall()}
+            
+            # Average overall score
+            cursor.execute("""
+                SELECT AVG(overall_score) as avg_score 
+                FROM evaluations 
+                WHERE overall_score IS NOT NULL
+            """)
+            result = cursor.fetchone()
+            stats['average_score'] = float(result['avg_score']) if result['avg_score'] else 0.0
+            
+            # Evaluations by evaluator
+            cursor.execute("""
+                SELECT evaluator_username, COUNT(*) as count 
+                FROM evaluations 
+                GROUP BY evaluator_username 
+                ORDER BY count DESC 
+                LIMIT 10
+            """)
+            stats['top_evaluators'] = cursor.fetchall()
+            
+            # Recent evaluations count (last 7 days)
+            cursor.execute("""
+                SELECT COUNT(*) as recent_count 
+                FROM evaluations 
+                WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+            """)
+            stats['recent_evaluations'] = cursor.fetchone()['recent_count']
+            
+            logger.debug("Retrieved evaluation statistics")
+        except Error as e:
+            logger.error(f"Error getting evaluation statistics: {e}")
+        finally:
+            cursor.close()
+            self.close()
+        return stats 

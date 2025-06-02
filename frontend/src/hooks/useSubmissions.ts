@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { submissionsApi } from '@/lib/api';
-import type { SubmissionRequest, SubmissionResponse } from '@/types';
+import type { SubmissionRequest, SubmissionResponse, SubmissionHistoryResponse } from '@/types';
 import { toast } from 'react-hot-toast';
 
 export function useSubmissions() {
@@ -24,8 +24,25 @@ export function useSubmissions() {
     }
   };
 
+  const getMySubmissions = async (page: number = 1, limit: number = 20): Promise<SubmissionHistoryResponse | null> => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await submissionsApi.getMySubmissions(page, limit);
+      return response;
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.detail || 'Failed to fetch submissions';
+      setError(errorMessage);
+      toast.error(errorMessage);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return {
     submitPrompt,
+    getMySubmissions,
     loading,
     error,
   };

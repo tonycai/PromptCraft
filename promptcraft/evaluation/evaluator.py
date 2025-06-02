@@ -3,17 +3,26 @@ Evaluator for PromptCraft.
 """
 import json
 import os
+from typing import Dict, Any, Optional, List
+from promptcraft.database.db_handler import DatabaseHandler
+from promptcraft.logger_config import setup_logger
 
+logger = setup_logger(__name__)
 
 class Evaluator:
     """Handles evaluation of candidate submissions."""
     
-    def __init__(self, output_dir="evaluation_results"):
-        """Initialize the evaluator with the output directory."""
+    def __init__(self, output_dir="evaluation_results", use_database=True):
+        """Initialize the evaluator with database support."""
         self.output_dir = output_dir
-        # Create output directory if it doesn't exist
+        self.use_database = use_database
+        self.db_handler = DatabaseHandler() if use_database else None
+        
+        # Keep output directory for backward compatibility
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
+        
+        logger.debug(f"Evaluator initialized with database: {use_database}")
             
     def evaluate_submission(self, candidate_id, task_id, prompt, 
                           generated_code=None, evaluation_criteria=None):
@@ -60,7 +69,43 @@ class Evaluator:
         return evaluation_result
         
     def _save_evaluation(self, evaluation_result):
-        """Save evaluation results to a file."""
+        """Save evaluation results to database and optionally to file."""
+        candidate_id = evaluation_result["candidate_id"]
+        task_id = evaluation_result["task_id"]
+        
+        if self.use_database and self.db_handler:
+            try:
+                # Save to database
+                evaluation_id = self.db_handler.create_evaluation(
+                    candidate_id=candidate_id,
+                    task_id=task_id,
+                    evaluator_user_id=evaluation_result.get("evaluator_user_id"),
+                    evaluator_username=evaluation_result.get("evaluator_username", "unknown"),
+                    prompt_evaluated=evaluation_result.get("prompt_evaluated", ""),
+                    generated_code_evaluated=evaluation_result.get("generated_code_evaluated"),
+                    evaluation_notes=evaluation_result.get("evaluation_notes", ""),
+                    evaluation_criteria_used=evaluation_result.get("evaluation_criteria_used"),
+                    scores=evaluation_result.get("scores", {}),
+                    submission_id=evaluation_result.get("submission_id"),
+                    overall_score=evaluation_result.get("overall_score")
+                )
+                
+                if evaluation_id:
+                    logger.info(f"Evaluation saved to database with ID: {evaluation_id}")
+                    evaluation_result["id"] = evaluation_id
+                else:
+                    logger.error("Failed to save evaluation to database")
+                    
+            except Exception as e:
+                logger.error(f"Error saving evaluation to database: {e}")
+                # Fall back to file system
+                self._save_evaluation_to_file(evaluation_result)
+        else:
+            # Save to file system
+            self._save_evaluation_to_file(evaluation_result)
+    
+    def _save_evaluation_to_file(self, evaluation_result):
+        """Save evaluation results to a file (fallback method)."""
         candidate_id = evaluation_result["candidate_id"]
         task_id = evaluation_result["task_id"]
         
@@ -68,18 +113,118 @@ class Evaluator:
         with open(filename, 'w') as f:
             json.dump(evaluation_result, f, indent=2)
             
-        print(f"Evaluation saved to '{filename}'")
+        logger.info(f"Evaluation saved to file: '{filename}'")
         
-    def get_candidate_evaluations(self, candidate_id):
+    def get_candidate_evaluations(self, candidate_id: str, limit: int = 50, offset: int = 0) -> List[Dict[str, Any]]:
         """Retrieve all evaluations for a specific candidate."""
+        if self.use_database and self.db_handler:
+            try:
+                evaluations = self.db_handler.get_candidate_evaluations(
+                    candidate_id=candidate_id, 
+                    limit=limit, 
+                    offset=offset
+                )
+                logger.debug(f"Retrieved {len(evaluations)} evaluations from database for candidate {candidate_id}")
+                return evaluations
+            except Exception as e:
+                logger.error(f"Error retrieving evaluations from database: {e}")
+                # Fall back to file system
+                return self._get_candidate_evaluations_from_files(candidate_id)
+        else:
+            return self._get_candidate_evaluations_from_files(candidate_id)
+    
+    def _get_candidate_evaluations_from_files(self, candidate_id: str) -> List[Dict[str, Any]]:
+        """Retrieve evaluations from file system (fallback method)."""
         evaluations = []
         
         # Look for all evaluation files for this candidate
         prefix = f"eval_{candidate_id}_"
-        for filename in os.listdir(self.output_dir):
-            if filename.startswith(prefix) and filename.endswith(".json"):
-                with open(os.path.join(self.output_dir, filename), 'r') as f:
-                    evaluation = json.load(f)
-                    evaluations.append(evaluation)
+        try:
+            for filename in os.listdir(self.output_dir):
+                if filename.startswith(prefix) and filename.endswith(".json"):
+                    with open(os.path.join(self.output_dir, filename), 'r') as f:
+                        evaluation = json.load(f)
+                        evaluations.append(evaluation)
+            logger.debug(f"Retrieved {len(evaluations)} evaluations from files for candidate {candidate_id}")
+        except Exception as e:
+            logger.error(f"Error reading evaluation files: {e}")
                     
-        return evaluations 
+        return evaluations
+    
+    def create_evaluation_structured(self, candidate_id: str, task_id: int, 
+                                   evaluator_user_id: int, evaluator_username: str,
+                                   prompt_evaluated: str, generated_code_evaluated: Optional[str] = None,
+                                   evaluation_notes: str = "", evaluation_criteria_used: Optional[Dict[str, Any]] = None,
+                                   scores: Optional[Dict[str, Any]] = None, submission_id: Optional[int] = None,
+                                   overall_score: Optional[float] = None) -> Optional[int]:
+        """Create a structured evaluation without interactive input."""
+        evaluation_result = {
+            "candidate_id": candidate_id,
+            "task_id": task_id,
+            "evaluator_user_id": evaluator_user_id,
+            "evaluator_username": evaluator_username,
+            "submission_id": submission_id,
+            "prompt_evaluated": prompt_evaluated,
+            "generated_code_evaluated": generated_code_evaluated,
+            "evaluation_notes": evaluation_notes,
+            "evaluation_criteria_used": evaluation_criteria_used,
+            "scores": scores or {},
+            "overall_score": overall_score
+        }
+        
+        self._save_evaluation(evaluation_result)
+        return evaluation_result.get("id")
+    
+    def get_evaluation_by_id(self, evaluation_id: int) -> Optional[Dict[str, Any]]:
+        """Get a specific evaluation by ID."""
+        if self.use_database and self.db_handler:
+            try:
+                return self.db_handler.get_evaluation_by_id(evaluation_id)
+            except Exception as e:
+                logger.error(f"Error retrieving evaluation by ID: {e}")
+        return None
+    
+    def get_evaluations_by_task(self, task_id: int, limit: int = 50, offset: int = 0) -> List[Dict[str, Any]]:
+        """Get all evaluations for a specific task."""
+        if self.use_database and self.db_handler:
+            try:
+                return self.db_handler.get_evaluations_by_task(task_id, limit, offset)
+            except Exception as e:
+                logger.error(f"Error retrieving evaluations by task: {e}")
+        return []
+    
+    def get_evaluations_by_evaluator(self, evaluator_user_id: int, limit: int = 50, offset: int = 0) -> List[Dict[str, Any]]:
+        """Get all evaluations by a specific evaluator."""
+        if self.use_database and self.db_handler:
+            try:
+                return self.db_handler.get_evaluations_by_evaluator(evaluator_user_id, limit, offset)
+            except Exception as e:
+                logger.error(f"Error retrieving evaluations by evaluator: {e}")
+        return []
+    
+    def update_evaluation(self, evaluation_id: int, **kwargs) -> bool:
+        """Update an evaluation."""
+        if self.use_database and self.db_handler:
+            try:
+                return self.db_handler.update_evaluation(evaluation_id, **kwargs)
+            except Exception as e:
+                logger.error(f"Error updating evaluation: {e}")
+        return False
+    
+    def delete_evaluation(self, evaluation_id: int) -> bool:
+        """Delete an evaluation."""
+        if self.use_database and self.db_handler:
+            try:
+                return self.db_handler.delete_evaluation(evaluation_id)
+            except Exception as e:
+                logger.error(f"Error deleting evaluation: {e}")
+        return False
+    
+    def get_evaluation_statistics(self) -> Dict[str, Any]:
+        """Get evaluation statistics."""
+        if self.use_database and self.db_handler:
+            try:
+                return self.db_handler.get_evaluation_statistics()
+            except Exception as e:
+                logger.error(f"Error retrieving evaluation statistics: {e}")
+        return {} 

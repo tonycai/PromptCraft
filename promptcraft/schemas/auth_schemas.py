@@ -1,6 +1,7 @@
 # promptcraft/schemas/auth_schemas.py
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
+from datetime import datetime
 
 class UserBase(BaseModel):
     email: EmailStr
@@ -10,10 +11,19 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     password: str = Field(..., min_length=8)
 
+class UserUpdate(BaseModel):
+    """Schema for updating user profile"""
+    full_name: Optional[str] = None
+    profile_photo_url: Optional[str] = None
+    profile_photo_ipfs_hash: Optional[str] = None
+
 class UserResponse(UserBase):
     id: int
     is_active: bool
     is_verified: bool
+    profile_photo_url: Optional[str] = None
+    profile_photo_ipfs_hash: Optional[str] = None
+    created_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True # Updated for Pydantic v2 (orm_mode in v1)

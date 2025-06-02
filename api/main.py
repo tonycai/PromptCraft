@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from api.routers import questions, submissions, evaluations, auth # Added auth router
+from api.routers import questions, submissions, evaluations, auth, leaderboard, analytics # Added auth, leaderboard, and analytics routers
 from promptcraft.exceptions import PromptCraftBaseException # Import base custom exception
 from promptcraft.logger_config import setup_logger # Import logger
 from promptcraft.error_handlers import setup_error_handlers
@@ -75,6 +75,8 @@ app.include_router(questions.router) # Include the questions router
 app.include_router(submissions.router) # Include the submissions router
 app.include_router(evaluations.router) # Include the evaluations router
 app.include_router(auth.router) # Added authentication router
+app.include_router(leaderboard.router) # Added leaderboard router
+app.include_router(analytics.router) # Added analytics router
 
 # Placeholder for future routers
 # from . import evaluations_router

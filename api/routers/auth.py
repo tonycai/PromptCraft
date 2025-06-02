@@ -4,7 +4,7 @@ from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer # F
 from typing import Any
 
 from promptcraft.database.db_handler import DatabaseHandler
-from promptcraft.schemas.auth_schemas import UserCreate, UserResponse, Token, LoginRequest, Msg, EmailVerificationRequest, VerifyTokenRequest
+from promptcraft.schemas.auth_schemas import UserCreate, UserResponse, UserUpdate, Token, LoginRequest, Msg, EmailVerificationRequest, VerifyTokenRequest
 from promptcraft import auth_utils # Renamed from auth_utils to avoid conflict
 from promptcraft.exceptions import BadRequestException, NotFoundException
 from promptcraft.logger_config import setup_logger
@@ -223,6 +223,38 @@ async def read_users_me(current_user: UserResponse = Depends(get_current_active_
     """Fetch the current authenticated user."""
     logger.info(f"User {current_user.username} (ID: {current_user.id}) accessed /users/me endpoint.")
     return current_user
+
+@router.patch("/users/me", response_model=UserResponse)
+async def update_user_profile(user_update: UserUpdate, current_user: UserResponse = Depends(get_current_active_user)):
+    """Update the current user's profile information."""
+    logger.info(f"User {current_user.username} (ID: {current_user.id}) updating profile.")
+    
+    # Update user in database
+    updated = db_handler.update_user(
+        user_id=current_user.id,
+        full_name=user_update.full_name,
+        profile_photo_url=user_update.profile_photo_url,
+        profile_photo_ipfs_hash=user_update.profile_photo_ipfs_hash
+    )
+    
+    if not updated:
+        logger.error(f"Failed to update user {current_user.id} profile.")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not update profile at this time."
+        )
+    
+    # Fetch and return updated user data
+    updated_user_data = db_handler.get_user_by_id(current_user.id)
+    if not updated_user_data:
+        logger.error(f"Could not retrieve updated user {current_user.id} data.")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Profile updated but could not retrieve updated data."
+        )
+    
+    logger.info(f"User {current_user.username} (ID: {current_user.id}) profile updated successfully.")
+    return UserResponse.model_validate(updated_user_data)
 
 # Note: Refresh token, password reset, account activation (if different from verification),
 # security headers, CORS, rate limiting, and Mailchimp integration are further steps. 
